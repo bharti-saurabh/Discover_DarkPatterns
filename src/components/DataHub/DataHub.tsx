@@ -22,7 +22,7 @@ export default function DataHub() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Data Hub</h1>
             <p className="text-sm text-slate-500 mt-1">
-              Explore both institutions' schemas, preview synthetic data, and trace entity relationships.
+              Explore both institutions' schemas, preview synthetic data, and trace cross-institution join paths.
             </p>
           </div>
           {/* Tab switcher */}

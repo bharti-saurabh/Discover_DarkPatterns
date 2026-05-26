@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { CORRIDOR_CASES, FINCEN_CATEGORIES, type CorridorCase, type CorridorStop } from '../../data/darkPatternsData'
+import { CORRIDOR_CASES, FINCEN_CATEGORIES, type CorridorCase, type CorridorStop, type SarStatus } from '../../data/darkPatternsData'
+import DetectionTrail from './DetectionTrail'
+import SarPanel from './SarPanel'
 
 const MCC_COLORS: Record<string, string> = {
   '7011': 'bg-rose-500',
@@ -17,6 +19,18 @@ const MCC_LIGHT: Record<string, string> = {
   '6010': 'bg-red-100 text-red-700 border-red-200',
   '7297': 'bg-pink-100 text-pink-700 border-pink-200',
   '7299': 'bg-pink-100 text-pink-700 border-pink-200',
+}
+
+const SAR_BADGE: Record<SarStatus['status'], { label: string; cls: string }> = {
+  'monitoring':  { label: 'Monitoring',  cls: 'bg-slate-100 text-slate-500' },
+  'sar-review':  { label: 'SAR Review',  cls: 'bg-amber-100 text-amber-700' },
+  'escalated':   { label: 'Escalated',   cls: 'bg-orange-100 text-orange-700' },
+  'sar-filed':   { label: 'SAR Filed',   cls: 'bg-emerald-100 text-emerald-700' },
+}
+
+function SarStatusBadge({ status }: { status: SarStatus['status'] }) {
+  const b = SAR_BADGE[status]
+  return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${b.cls}`}>{b.label}</span>
 }
 
 function RiskBadge({ score }: { score: number }) {
@@ -139,6 +153,8 @@ function CityTimeline({ corridorCase }: { corridorCase: CorridorCase }) {
 function CaseDetail({ c }: { c: CorridorCase }) {
   return (
     <div className="space-y-4">
+      <SarPanel sarStatus={c.sarStatus} crossCaseRefs={c.crossCaseRefs} />
+      <DetectionTrail steps={c.detectionTrail} />
       {/* Timeline */}
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-center justify-between mb-3">
@@ -238,8 +254,11 @@ export default function CorridorView() {
             <div className={`text-xs ${selectedId === c.id ? 'text-slate-400' : 'text-slate-500'}`}>
               Home: {c.homeCityState} · {c.stops.length} stops · {Math.max(...c.stops.map(s => s.day))} days
             </div>
-            <div className="flex gap-1 mt-2 flex-wrap">
-              {c.flaggedCategories.map(id => <FinCENTag key={id} id={id} />)}
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex gap-1 flex-wrap">
+                {c.flaggedCategories.map(id => <FinCENTag key={id} id={id} />)}
+              </div>
+              <SarStatusBadge status={c.sarStatus.status} />
             </div>
           </button>
         ))}

@@ -10,7 +10,7 @@ const STATS: Stat[] = [
   { label: 'Capital One Transactions',value: '50,000',  sub: 'Issuer auth records',     accent: 'indigo' },
   { label: 'Discover Customers',      value: '4,000',   sub: 'Discover cardholders',    accent: 'violet' },
   { label: 'Network Transactions',      value: '100,000', sub: 'All issuers on network',  accent: 'violet' },
-  { label: 'Resolvable Entities',       value: '~2,000',  sub: 'Same person, both CRMs',  accent: 'amber' },
+  { label: 'Matched Customers',          value: '~2,000',  sub: 'Same person, both CRMs',  accent: 'slate' },
   { label: 'Tables',                    value: '16',      sub: '6 issuer · 10 network',   accent: 'slate' },
 ]
 

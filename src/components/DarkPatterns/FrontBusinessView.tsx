@@ -1,6 +1,20 @@
 import { useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
-import { FRONT_BUSINESS_CASES, FINCEN_CATEGORIES, type FrontBusinessCase } from '../../data/darkPatternsData'
+import { FRONT_BUSINESS_CASES, FINCEN_CATEGORIES, type FrontBusinessCase, type SarStatus } from '../../data/darkPatternsData'
+import DetectionTrail from './DetectionTrail'
+import SarPanel from './SarPanel'
+
+const SAR_BADGE: Record<SarStatus['status'], { label: string; cls: string }> = {
+  'monitoring':  { label: 'Monitoring',  cls: 'bg-slate-100 text-slate-500' },
+  'sar-review':  { label: 'SAR Review',  cls: 'bg-amber-100 text-amber-700' },
+  'escalated':   { label: 'Escalated',   cls: 'bg-orange-100 text-orange-700' },
+  'sar-filed':   { label: 'SAR Filed',   cls: 'bg-emerald-100 text-emerald-700' },
+}
+
+function SarStatusBadge({ status }: { status: SarStatus['status'] }) {
+  const b = SAR_BADGE[status]
+  return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${b.cls}`}>{b.label}</span>
+}
 
 function fmt$(n: number) {
   if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`
@@ -67,6 +81,8 @@ function HourChart({ data, nightPct }: { data: FrontBusinessCase['hourlyVolume']
 function CaseDetail({ c }: { c: FrontBusinessCase }) {
   return (
     <div className="space-y-4">
+      <SarPanel sarStatus={c.sarStatus} crossCaseRefs={c.crossCaseRefs} />
+      <DetectionTrail steps={c.detectionTrail} />
       {/* Merchant header */}
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-start justify-between mb-3">
@@ -216,16 +232,19 @@ export default function FrontBusinessView() {
                 </span>
               </div>
             )}
-            <div className="flex gap-1 mt-2 flex-wrap">
-              {c.flaggedCategories.map(id => {
-                const cat = FINCEN_CATEGORIES[id]
-                return (
-                  <a key={id} href={cat?.sourceUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-[10px] font-semibold bg-slate-800 text-white px-2 py-0.5 rounded hover:bg-slate-600 transition-colors">
-                    {id} ↗
-                  </a>
-                )
-              })}
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex gap-1 flex-wrap">
+                {c.flaggedCategories.map(id => {
+                  const cat = FINCEN_CATEGORIES[id]
+                  return (
+                    <a key={id} href={cat?.sourceUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-[10px] font-semibold bg-slate-800 text-white px-2 py-0.5 rounded hover:bg-slate-600 transition-colors">
+                      {id} ↗
+                    </a>
+                  )
+                })}
+              </div>
+              <SarStatusBadge status={c.sarStatus.status} />
             </div>
           </button>
         ))}

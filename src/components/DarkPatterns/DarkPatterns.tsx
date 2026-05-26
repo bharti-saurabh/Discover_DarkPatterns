@@ -1,99 +1,34 @@
 import { useState } from 'react'
-import { DARK_PATTERN_STATS, FINCEN_CATEGORIES } from '../../data/darkPatternsData'
+import { DARK_PATTERN_STATS } from '../../data/darkPatternsData'
 import CorridorView from './CorridorView'
 import ControllerGraph from './ControllerGraph'
 import FrontBusinessView from './FrontBusinessView'
+import PlaybookView from './PlaybookView'
 
-type DarkTab = 'corridor' | 'controller' | 'front-business'
+type DarkTab = 'corridor' | 'controller' | 'front-business' | 'playbook'
 
-const TABS: { id: DarkTab; label: string; sublabel: string }[] = [
-  { id: 'corridor',       label: 'Geographic Corridors', sublabel: 'Movement pattern analysis' },
-  { id: 'controller',     label: 'Controller Networks',  sublabel: 'Device & IP clustering' },
-  { id: 'front-business', label: 'Front Businesses',     sublabel: 'Merchant anomaly detection' },
-]
-
-const ADVISORIES = [
-  {
-    id: 'FIN-2014-A008',
-    title: 'Guidance on Recognizing Activity that May be Associated with Human Smuggling and Human Trafficking — Financial Red Flags',
-    year: 2014,
-    url: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008',
-  },
-  {
-    id: 'FIN-2020-A008',
-    title: 'Supplemental Advisory on Identifying and Reporting Human Trafficking and Related Activity',
-    year: 2020,
-    url: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008',
-  },
+const TABS: { id: DarkTab; label: string; count: number | string }[] = [
+  { id: 'corridor',       label: 'Geographic Corridors', count: 2 },
+  { id: 'controller',     label: 'Controller Networks',  count: 1 },
+  { id: 'front-business', label: 'Front Businesses',     count: 2 },
+  { id: 'playbook',       label: 'Detection Playbook',   count: 6 },
 ]
 
 function StatBar() {
   return (
-    <div className="grid grid-cols-4 gap-4 mb-5">
+    <div className="grid grid-cols-4 gap-3 mb-3">
       {[
-        { label: 'Entities Flagged',    value: DARK_PATTERN_STATS.totalEntitiesFlagged,       color: 'text-rose-600' },
-        { label: 'Cards Involved',      value: DARK_PATTERN_STATS.totalCardsInvolved,          color: 'text-amber-600' },
-        { label: 'FinCEN Categories',   value: DARK_PATTERN_STATS.fincenCategoriesTriggered,   color: 'text-indigo-600' },
-        { label: 'Est. Illicit Volume', value: `$${(DARK_PATTERN_STATS.estimatedExposure / 1000000).toFixed(1)}M`, color: 'text-red-700' },
+        { label: 'Entities Flagged',    value: DARK_PATTERN_STATS.totalEntitiesFlagged,       sub: '3 corridors · 9 accounts · 2 merchants', color: 'text-rose-600' },
+        { label: 'Cards Involved',      value: DARK_PATTERN_STATS.totalCardsInvolved,          sub: '6 issuing banks · 4 Cap One accounts',    color: 'text-slate-700' },
+        { label: 'FinCEN Categories',   value: DARK_PATTERN_STATS.fincenCategoriesTriggered,   sub: 'FIN-2014-A008 · FIN-2020-A008',           color: 'text-indigo-600' },
+        { label: 'Est. Illicit Volume', value: `$${(DARK_PATTERN_STATS.estimatedExposure / 1000000).toFixed(1)}M`, sub: 'Merchants $276K + cash-out $35K',  color: 'text-red-700' },
       ].map(s => (
-        <div key={s.label} className="bg-white rounded-xl border border-slate-200 px-4 py-3">
-          <div className="text-[11px] text-slate-400 font-medium mb-0.5">{s.label}</div>
-          <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+        <div key={s.label} className="bg-white rounded-lg border border-slate-200 px-3 py-2">
+          <div className="text-[10px] text-slate-400 font-medium mb-0.5">{s.label}</div>
+          <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+          <div className="text-[9px] text-slate-400 mt-0.5 leading-snug">{s.sub}</div>
         </div>
       ))}
-    </div>
-  )
-}
-
-function AdvisoryBanner() {
-  const [expanded, setExpanded] = useState(false)
-
-  return (
-    <div className="bg-amber-50 border border-amber-200 rounded-xl mb-5 overflow-hidden">
-      <button
-        onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-          <polyline points="10 9 9 9 8 9"/>
-        </svg>
-        <div className="flex-1">
-          <span className="text-xs font-semibold text-amber-800">FinCEN Advisory References</span>
-          <span className="text-xs text-amber-600 ml-2">{ADVISORIES.map(a => a.id).join(' · ')} — fincen.gov</span>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}>
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
-
-      {expanded && (
-        <div className="px-4 pb-4 border-t border-amber-200 pt-3 space-y-3">
-          {ADVISORIES.map(adv => (
-            <div key={adv.id} className="flex gap-3">
-              <span className="text-[11px] font-bold text-amber-700 font-mono shrink-0 mt-0.5">{adv.id}</span>
-              <div>
-                <a
-                  href={adv.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] font-semibold text-amber-900 hover:underline"
-                >
-                  {adv.title} ↗
-                </a>
-                <div className="text-[10px] text-amber-600 mt-0.5">
-                  Categories: {Object.entries(FINCEN_CATEGORIES)
-                    .filter(([, v]) => v.source.includes(adv.id))
-                    .map(([k]) => k).join(', ')}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -102,38 +37,77 @@ export default function DarkPatterns() {
   const [activeTab, setActiveTab] = useState<DarkTab>('corridor')
 
   return (
-    <div className="flex flex-col h-full p-6 overflow-hidden">
-      {/* Header */}
-      <div className="mb-4">
-        <div className="flex items-center gap-3 mb-1">
-          <h1 className="text-xl font-bold text-slate-900">Dark Pattern Detection</h1>
-          <span className="text-[10px] font-semibold bg-red-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
-            FinCEN Intelligence
-          </span>
+    <div className="flex flex-col h-full px-6 pt-4 pb-4 overflow-hidden">
+      {/* Header row */}
+      <div className="flex items-center gap-3 mb-2">
+        <h1 className="text-lg font-bold text-slate-900">Dark Pattern Detection</h1>
+        <span className="text-[10px] font-semibold bg-red-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+          FinCEN Intelligence
+        </span>
+        <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-semibold">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+          Live monitoring
+        </span>
+
+        {/* Detection pipeline — compact inline */}
+        <div className="ml-auto flex items-center gap-1 bg-slate-900 rounded-lg px-3 py-1.5">
+          {[
+            { label: 'Ingest', detail: '150K txns' },
+            { label: 'Anomaly', detail: '47 signals' },
+            { label: 'Matching', detail: '5 cases' },
+            { label: 'FinCEN', detail: '6 cats' },
+            { label: 'Alert', detail: '5 alerts' },
+          ].map((stage, i, arr) => (
+            <div key={stage.label} className="flex items-center gap-1">
+              <div className="text-center">
+                <div className="flex items-center gap-0.5">
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  <span className="text-[9px] font-semibold text-slate-300">{stage.label}</span>
+                </div>
+                <span className="text-[8px] text-emerald-400 font-mono">{stage.detail}</span>
+              </div>
+              {i < arr.length - 1 && <span className="text-slate-700 text-[9px] mx-0.5">›</span>}
+            </div>
+          ))}
         </div>
-        <p className="text-sm text-slate-500">
-          Cross-network behavioral signals surfacing trafficking, exploitation, and illicit finance patterns — invisible to either institution alone.
-        </p>
+
+        <div className="text-right shrink-0">
+          <div className="text-[9px] text-slate-400">Last run</div>
+          <div className="text-[10px] font-mono font-semibold text-slate-600">2024-11-15 00:31 UTC</div>
+        </div>
       </div>
 
       <StatBar />
-      <AdvisoryBanner />
 
-      {/* Tab bar */}
-      <div className="flex gap-1 mb-4 bg-slate-100 p-1 rounded-xl w-fit">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Tab bar + FinCEN advisory links */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                activeTab === tab.id
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.label}
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                activeTab === tab.id ? 'bg-slate-100 text-slate-600' : 'bg-slate-200 text-slate-500'
+              }`}>{tab.count}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-[10px] text-slate-400 ml-auto">
+          <span>FinCEN refs:</span>
+          <a href="https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008" target="_blank" rel="noopener noreferrer"
+            className="font-semibold text-amber-600 hover:text-amber-500">FIN-2014-A008 ↗</a>
+          <a href="https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008" target="_blank" rel="noopener noreferrer"
+            className="font-semibold text-amber-600 hover:text-amber-500">FIN-2020-A008 ↗</a>
+        </div>
       </div>
 
       {/* Tab content */}
@@ -141,6 +115,7 @@ export default function DarkPatterns() {
         {activeTab === 'corridor'       && <CorridorView />}
         {activeTab === 'controller'     && <ControllerGraph />}
         {activeTab === 'front-business' && <FrontBusinessView />}
+        {activeTab === 'playbook'       && <PlaybookView />}
       </div>
     </div>
   )

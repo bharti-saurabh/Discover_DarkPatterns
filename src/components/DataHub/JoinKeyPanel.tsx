@@ -12,7 +12,7 @@ interface Props {
 
 const CATEGORY_CONFIG: Record<Category, { label: string; color: string; dot: string; desc: string }> = {
   hard:       { label: 'Hard Joins', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', desc: 'Deterministic — same value on both sides' },
-  soft:       { label: 'Soft Joins', color: 'bg-amber-100 text-amber-700 border-amber-200',       dot: 'bg-amber-500',   desc: 'Fuzzy — entity resolution signals' },
+  soft:       { label: 'Soft Joins', color: 'bg-amber-100 text-amber-700 border-amber-200',       dot: 'bg-amber-500',   desc: 'Fuzzy — probabilistic match signals' },
   behavioral: { label: 'Behavioral', color: 'bg-rose-100 text-rose-700 border-rose-200',           dot: 'bg-rose-500',    desc: 'Pattern-matched — no shared field' },
 }
 
