@@ -5,7 +5,7 @@ export interface AgentDef {
   description: string
   scanCount: string
   scanLabel: string
-  appliesTo: ('cardholder' | 'merchant' | 'controller')[]
+  appliesTo: ('cardholder' | 'merchant' | 'cluster')[]
 }
 
 export interface CoTStep {
@@ -32,7 +32,7 @@ export const AGENTS: AgentDef[] = [
     description: 'Trafficking MCC ratios, hotel→cash sequences, multi-issuer BIN clustering',
     scanCount: '47,823',
     scanLabel: 'cardholders',
-    appliesTo: ['cardholder', 'controller'],
+    appliesTo: ['cardholder', 'cluster'],
   },
   {
     id: 'cash',
@@ -41,7 +41,7 @@ export const AGENTS: AgentDef[] = [
     description: 'ATM velocity, prepaid reload patterns, structuring below CTR threshold',
     scanCount: '47,823',
     scanLabel: 'cardholders',
-    appliesTo: ['cardholder', 'controller'],
+    appliesTo: ['cardholder', 'cluster'],
   },
   {
     id: 'movement',
@@ -77,7 +77,7 @@ export const AGENTS: AgentDef[] = [
     description: 'Device fingerprint clustering, session IP × terminal IP cross-match',
     scanCount: '12,941',
     scanLabel: 'accounts',
-    appliesTo: ['controller'],
+    appliesTo: ['cluster'],
   },
   {
     id: 'strategist',
@@ -86,7 +86,7 @@ export const AGENTS: AgentDef[] = [
     description: 'Synthesizes all agent signals → final risk verdict and SAR recommendation',
     scanCount: '5',
     scanLabel: 'active cases',
-    appliesTo: ['cardholder', 'merchant', 'controller'],
+    appliesTo: ['cardholder', 'merchant', 'cluster'],
   },
 ]
 
