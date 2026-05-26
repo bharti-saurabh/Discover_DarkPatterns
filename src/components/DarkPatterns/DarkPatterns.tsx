@@ -288,64 +288,54 @@ function buildClusterGraph(c: ControllerCase): { nodes: Node[]; edges: Edge[] } 
 
 // ── Shared center-panel sections ──────────────────────────────────────────────────
 
-function MetricCard({ label, value, peer, anomaly }: { label: string; value: string; peer: string; anomaly?: boolean }) {
+function MetricCard({ label, value, peer, multiplier, anomaly }: { label: string; value: string; peer: string; multiplier?: string; anomaly?: boolean }) {
   return (
     <div className={`rounded-xl p-3 border ${anomaly ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
       <div className="text-[9px] text-slate-500 font-medium mb-1">{label}</div>
-      <div className={`text-base font-bold ${anomaly ? 'text-red-700' : 'text-slate-900'}`}>{value}</div>
-      <div className="text-[9px] text-slate-400 mt-0.5">Peer: {peer}</div>
+      <div className="flex items-end gap-1.5">
+        <div className={`text-lg font-bold leading-none ${anomaly ? 'text-red-700' : 'text-slate-900'}`}>{value}</div>
+        {multiplier && <span className={`text-[9px] font-bold rounded px-1 py-0.5 leading-none mb-0.5 ${anomaly ? 'bg-red-200 text-red-700' : 'bg-slate-200 text-slate-600'}`}>{multiplier}</span>}
+      </div>
+      <div className="text-[8px] text-slate-400 mt-1.5">peer {peer}</div>
     </div>
   )
 }
 
 function AgentSignalGrid({ findings }: { findings: AgentFinding[] }) {
   if (!findings.length) return null
+  const top = [...findings].sort((a, b) => b.confidence - a.confidence).find(f => f.verdict === 'FLAGGED')
   return (
-    <div>
-      <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-2">Agent Detections</div>
-      <div className="grid grid-cols-2 gap-2">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Detection Signals</span>
+        <div className="flex gap-2">
+          <span className="flex items-center gap-1 text-[8px] text-red-600"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> Flagged</span>
+          <span className="flex items-center gap-1 text-[8px] text-amber-600"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Review</span>
+        </div>
+      </div>
+      <div className="px-4 pt-3 pb-1 space-y-2">
         {findings.map(f => {
           const agent = AGENTS.find(a => a.id === f.agentId)!
+          const isFlagged = f.verdict === 'FLAGGED'
           return (
-            <div key={f.agentId} className={`rounded-xl p-3 border ${f.verdict === 'FLAGGED' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
-              <div className="flex items-center justify-between gap-1 mb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[8px] font-bold text-indigo-600 font-mono">{agent.htRule}</span>
-                  <span className="text-[9px] font-semibold text-slate-800">{agent.name}</span>
-                </div>
-                <VerdictChip verdict={f.verdict} />
+            <div key={f.agentId} className="group relative flex items-center gap-3">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`} />
+              <span className="text-[8px] font-bold font-mono text-indigo-500 w-7 shrink-0">{agent.htRule}</span>
+              <span className="text-[10px] font-medium text-slate-700 w-24 shrink-0 truncate">{agent.name}</span>
+              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`} style={{ width: `${f.confidence}%` }} />
               </div>
-              <p className="text-[9px] text-slate-700 leading-snug mb-2">{f.finding}</p>
-              <ConfidenceBar value={f.confidence} />
+              <span className={`text-[9px] font-mono font-bold w-7 text-right shrink-0 ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>{f.confidence}%</span>
+              <div className="absolute left-20 top-full mt-1 hidden group-hover:block z-20 bg-slate-900 text-white text-[9px] rounded-lg px-2.5 py-1.5 max-w-xs shadow-xl pointer-events-none leading-snug whitespace-normal">
+                {f.finding}
+              </div>
             </div>
           )
         })}
       </div>
-    </div>
-  )
-}
-
-function InstitutionSignals({ data }: { data: Record<string, string | undefined> }) {
-  const a = data['capOneSignal'], b = data['discoverSignal'], combined = data['combinedInsight']
-  if (!a && !b && !combined) return null
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {a && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
-          <div className="flex items-center gap-1.5 mb-1.5"><div className="w-2 h-2 rounded-full bg-indigo-500" /><span className="text-[8px] font-bold text-indigo-700 uppercase tracking-wider">Institution A</span></div>
-          <p className="text-[10px] text-indigo-900 leading-relaxed">{a}</p>
-        </div>
-      )}
-      {b && (
-        <div className="bg-violet-50 border border-violet-200 rounded-xl p-3">
-          <div className="flex items-center gap-1.5 mb-1.5"><div className="w-2 h-2 rounded-full bg-violet-500" /><span className="text-[8px] font-bold text-violet-700 uppercase tracking-wider">Institution B</span></div>
-          <p className="text-[10px] text-violet-900 leading-relaxed">{b}</p>
-        </div>
-      )}
-      {combined && (
-        <div className="bg-slate-900 rounded-xl p-3">
-          <div className="flex items-center gap-1.5 mb-1.5"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-[8px] font-bold text-emerald-400 uppercase tracking-wider">Combined</span></div>
-          <p className="text-[10px] text-slate-200 leading-relaxed">{combined}</p>
+      {top && (
+        <div className="mx-4 mb-3 mt-2 px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-[9px] leading-snug text-red-800">
+          <span className="font-bold">{AGENTS.find(a => a.id === top.agentId)?.name}: </span>{top.finding}
         </div>
       )}
     </div>
@@ -354,24 +344,20 @@ function InstitutionSignals({ data }: { data: Record<string, string | undefined>
 
 function FinCENPanel({ categories }: { categories: string[] }) {
   return (
-    <div className="bg-slate-900 rounded-xl p-4">
+    <div className="bg-white rounded-xl border border-slate-200 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-        </svg>
-        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">FinCEN Advisory Categories Triggered</span>
+        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">FinCEN Advisory Triggers</span>
+        <span className="ml-auto text-[8px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{categories.length} matched</span>
       </div>
-      <div className="space-y-2.5">
+      <div className="flex flex-wrap gap-2">
         {categories.map(id => {
           const cat = FINCEN_CATEGORIES[id]
           return (
-            <div key={id} className="flex gap-3">
-              <a href={cat?.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-amber-400 shrink-0 hover:text-amber-300 mt-0.5">{id} ↗</a>
-              <div>
-                <div className="text-[11px] font-semibold text-white">{cat?.label}</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">{cat?.description}</div>
-              </div>
-            </div>
+            <a key={id} href={cat?.sourceUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 hover:bg-amber-100 transition-colors">
+              <span className="text-[8px] font-bold text-amber-600 font-mono shrink-0 mt-0.5">{id} ↗</span>
+              <span className="text-[9px] text-amber-800 font-medium leading-tight">{cat?.label}</span>
+            </a>
           )
         })}
       </div>
@@ -393,10 +379,43 @@ function StrategistVerdict({ f }: { f: AgentFinding }) {
   )
 }
 
+// ── MCC spend breakdown (cardholder) ─────────────────────────────────────────────
+
+function MccBreakdown({ c }: { c: CorridorCase }) {
+  const counts: Record<string, { label: string; count: number }> = {}
+  c.stops.forEach(stop => stop.transactions.forEach(t => {
+    if (!counts[t.mcc]) counts[t.mcc] = { label: t.mccLabel, count: 0 }
+    counts[t.mcc].count++
+  }))
+  const total = Object.values(counts).reduce((s, v) => s + v.count, 0)
+  const breakdown = Object.entries(counts)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([mcc, { label, count }]) => ({ mcc, label, count, pct: count / total }))
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-100">
+      <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-2">Transaction Mix</div>
+      <div className="flex h-3 rounded-full overflow-hidden gap-px mb-2">
+        {breakdown.map(b => (
+          <div key={b.mcc} className={MCC_DOT[b.mcc] ?? 'bg-slate-400'} style={{ width: `${b.pct * 100}%` }} />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {breakdown.map(b => (
+          <span key={b.mcc} className="flex items-center gap-1.5 text-[9px] text-slate-600">
+            <span className={`w-2 h-2 rounded-sm ${MCC_DOT[b.mcc] ?? 'bg-slate-400'} inline-block shrink-0`} />
+            {b.label}
+            <span className="font-bold text-slate-800">{(b.pct * 100).toFixed(0)}%</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Cardholder detail ─────────────────────────────────────────────────────────────
 
 function CardholderDetail({ c, findings, strategist }: { c: CorridorCase; findings: AgentFinding[]; strategist?: AgentFinding }) {
-  const data = c as unknown as Record<string, string>
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -437,10 +456,10 @@ function CardholderDetail({ c, findings, strategist }: { c: CorridorCase; findin
           </div>
         </div>
         <CityTimeline c={c} />
+        <MccBreakdown c={c} />
       </div>
 
       <AgentSignalGrid findings={findings} />
-      <InstitutionSignals data={data} />
       <FinCENPanel categories={c.flaggedCategories} />
       {strategist && <StrategistVerdict f={strategist} />}
     </div>
@@ -450,7 +469,8 @@ function CardholderDetail({ c, findings, strategist }: { c: CorridorCase; findin
 // ── Merchant detail ───────────────────────────────────────────────────────────────
 
 function MerchantDetail({ c, findings, strategist }: { c: FrontBusinessCase; findings: AgentFinding[]; strategist?: AgentFinding }) {
-  const data = c as unknown as Record<string, string>
+  const volMultiplier = c.peerMonthlyVolume > 0 ? `${(c.monthlyVolume / c.peerMonthlyVolume).toFixed(1)}×` : undefined
+  const cnpMultiplier = `${(c.cnpPct * 100).toFixed(0)}% vs 30%`
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -469,7 +489,7 @@ function MerchantDetail({ c, findings, strategist }: { c: FrontBusinessCase; fin
             <div className={`text-3xl font-bold font-mono ${c.riskScore >= 90 ? 'text-red-600' : 'text-orange-500'}`}>{c.riskScore}</div>
             {c.commercialCounterpartyId && (
               <div className="mt-1.5 text-[9px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
-                Credit link: {fmt$(c.commercialExposure ?? 0)}
+                Credit exposure: {fmt$(c.commercialExposure ?? 0)}
               </div>
             )}
           </div>
@@ -478,33 +498,15 @@ function MerchantDetail({ c, findings, strategist }: { c: FrontBusinessCase; fin
 
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="grid grid-cols-4 gap-3 mb-4">
-          <MetricCard label="Monthly Volume" value={fmt$(c.monthlyVolume)} peer={fmt$(c.peerMonthlyVolume)} anomaly={c.monthlyVolume > c.peerMonthlyVolume * 2.5} />
+          <MetricCard label="Monthly Volume" value={fmt$(c.monthlyVolume)} peer={fmt$(c.peerMonthlyVolume)} multiplier={volMultiplier} anomaly={c.monthlyVolume > c.peerMonthlyVolume * 2.5} />
           <MetricCard label="Avg Ticket" value={`$${c.avgTicket}`} peer={`$${c.peerAvgTicket}`} />
-          <MetricCard label="Chargeback Rate" value={c.chargebackRate === 0 ? '0.00%' : pct(c.chargebackRate)} peer={pct(c.peerChargebackRate)} anomaly={c.chargebackRate < 0.002} />
-          <MetricCard label="Card-Not-Present" value={pct(c.cnpPct)} peer="~30%" anomaly={c.cnpPct > 0.7} />
+          <MetricCard label="Chargeback Rate" value={c.chargebackRate === 0 ? '0.00%' : pct(c.chargebackRate)} peer={pct(c.peerChargebackRate)} multiplier={c.chargebackRate < 0.002 ? '⚠ zero' : undefined} anomaly={c.chargebackRate < 0.002} />
+          <MetricCard label="Card-Not-Present" value={pct(c.cnpPct)} peer="~30%" multiplier={cnpMultiplier} anomaly={c.cnpPct > 0.7} />
         </div>
         <HourChart data={c.hourlyVolume} nightPct={c.nightPct} />
       </div>
 
-      {c.fincenRedFlags?.length > 0 && (
-        <div className="bg-slate-900 rounded-xl p-4">
-          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-3">FinCEN Red Flags — {c.fincenRedFlags.length} triggered</div>
-          <div className="space-y-3">
-            {c.fincenRedFlags.map((rf, i) => (
-              <div key={i} className="flex gap-3 pb-3 border-b border-slate-800 last:border-0 last:pb-0">
-                <div className="w-5 h-5 rounded-full bg-red-700 text-white flex items-center justify-center shrink-0 text-[9px] font-bold">{i + 1}</div>
-                <div>
-                  <div className="text-[11px] font-semibold text-white">{rf.flag}</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">{rf.detail}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <AgentSignalGrid findings={findings} />
-      <InstitutionSignals data={data} />
       <FinCENPanel categories={c.flaggedCategories} />
       {strategist && <StrategistVerdict f={strategist} />}
     </div>
@@ -515,7 +517,6 @@ function MerchantDetail({ c, findings, strategist }: { c: FrontBusinessCase; fin
 
 function ClusterDetail({ c, findings, strategist }: { c: ControllerCase; findings: AgentFinding[]; strategist?: AgentFinding }) {
   const { nodes, edges } = useMemo(() => buildClusterGraph(c), [c])
-  const data = c as unknown as Record<string, string>
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -589,7 +590,6 @@ function ClusterDetail({ c, findings, strategist }: { c: ControllerCase; finding
       )}
 
       <AgentSignalGrid findings={findings} />
-      <InstitutionSignals data={data} />
       <FinCENPanel categories={c.flaggedCategories} />
       {strategist && <StrategistVerdict f={strategist} />}
     </div>
