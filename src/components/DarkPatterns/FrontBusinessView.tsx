@@ -149,34 +149,6 @@ function CaseDetail({ c }: { c: FrontBusinessCase }) {
         </div>
       </div>
 
-      {/* Signal split */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-indigo-500" />
-            <span className="text-xs font-semibold text-indigo-700">Capital One sees</span>
-          </div>
-          <p className="text-[11px] text-indigo-800 leading-relaxed">{c.capOneSignal}</p>
-        </div>
-        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-violet-500" />
-            <span className="text-xs font-semibold text-violet-700">Discover sees</span>
-          </div>
-          <p className="text-[11px] text-violet-800 leading-relaxed">{c.discoverSignal}</p>
-        </div>
-        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#E11D48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-            </svg>
-            <span className="text-xs font-semibold text-rose-700">Combined insight</span>
-          </div>
-          <p className="text-[11px] text-rose-800 leading-relaxed">{c.combinedInsight}</p>
-        </div>
-      </div>
-
       {/* FinCEN category detail */}
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="text-xs font-semibold text-slate-600 mb-3">FinCEN Advisory Categories</div>

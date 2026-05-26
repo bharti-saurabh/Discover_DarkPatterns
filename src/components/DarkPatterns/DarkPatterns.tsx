@@ -11,7 +11,7 @@ const TABS: { id: DarkTab; label: string; count: number | string }[] = [
   { id: 'corridor',       label: 'Geographic Corridors', count: 2 },
   { id: 'controller',     label: 'Controller Networks',  count: 1 },
   { id: 'front-business', label: 'Front Businesses',     count: 2 },
-  { id: 'playbook',       label: 'Detection Playbook',   count: 6 },
+  { id: 'playbook',       label: 'FinCEN Rulebook',       count: 6 },
 ]
 
 function StatBar() {

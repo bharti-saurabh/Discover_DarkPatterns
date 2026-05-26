@@ -9,10 +9,25 @@ export interface DataField {
   description: string
 }
 
+export interface EvidenceMetric {
+  label: string
+  observed: string
+  threshold: string
+  triggered: boolean
+}
+
+export interface CaseEvidence {
+  caseId: string
+  finding: string
+  metrics: EvidenceMetric[]
+}
+
 export interface PlaybookRule {
   categoryId: string
+  ruleId: string
   advisoryRef: string
   advisoryUrl: string
+  advisoryTitle: string
   advisoryGuidance: string
   detectionObjective: string
   computationalSteps: string[]
@@ -21,13 +36,16 @@ export interface PlaybookRule {
   discoverAlone: { capability: string; limitation: string }
   combined: { capability: string; uniqueInsight: string }
   triggeredCases: string[]
+  evidence: CaseEvidence[]
 }
 
 export const PLAYBOOK_RULES: PlaybookRule[] = [
   {
     categoryId: '14-MCC',
+    ruleId: 'HT-1',
     advisoryRef: 'FIN-2014-A008',
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008',
+    advisoryTitle: 'Guidance on Recognizing Activity that May be Associated with Human Smuggling and Human Trafficking — Financial Red Flags',
     advisoryGuidance:
       'Financial institutions should identify transactions at hotels, motels, massage parlors, escort services, rideshare providers, and adult entertainment venues — especially when multiple indicators cluster at the same merchant or geographic area over a concentrated time period. Absence of ordinary consumer spending (grocery, dining, retail) alongside trafficking-adjacent MCC concentration is itself a red flag.',
     detectionObjective:
@@ -59,12 +77,50 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
       uniqueInsight: 'CORR-001: Cap One identified CAP-004821 as a solo corridor case. Discover confirmed 8–14 other cross-issuer cards at the identical hotel properties on the same nights. The cardholder is one participant in a coordinated multi-card operation — only visible when both datasets combine.',
     },
     triggeredCases: ['CORR-001', 'CORR-002', 'FRONT-001', 'FRONT-002'],
+    evidence: [
+      {
+        caseId: 'CORR-001',
+        finding: 'CAP-004821: 100% of spend in trafficking MCCs over 18 days; Hotel→ATM sequence repeated 6× along I-95',
+        metrics: [
+          { label: 'Trafficking MCC ratio', observed: '~85%', threshold: '>70%', triggered: true },
+          { label: 'Hotel→ATM sequences', observed: '6', threshold: '≥2', triggered: true },
+          { label: 'Cross-issuer BIN clustering', observed: '8–14 BINs at 5 merchants', threshold: '≥8 BINs', triggered: true },
+        ],
+      },
+      {
+        caseId: 'CORR-002',
+        finding: 'CAP-007342: New account (34 days) immediately exhibits trafficking MCC dominance; Beaumont merchant flagged as repeat nexus',
+        metrics: [
+          { label: 'Trafficking MCC ratio', observed: '~80%', threshold: '>70%', triggered: true },
+          { label: 'Hotel→ATM sequences', observed: '4', threshold: '≥2', triggered: true },
+          { label: 'Merchant nexus events', observed: '3 events in 45 days', threshold: '≥3 events', triggered: true },
+        ],
+      },
+      {
+        caseId: 'FRONT-001',
+        finding: 'MID-0003847: MCC 7297 volume 6.5× peer median; 91% CNP for a declared in-person massage parlor',
+        metrics: [
+          { label: 'Volume vs MCC peer', observed: '$182K vs $28K (6.5×)', threshold: '>2.5×', triggered: true },
+          { label: 'CNP rate (in-person MCC)', observed: '91%', threshold: '>70%', triggered: true },
+        ],
+      },
+      {
+        caseId: 'FRONT-002',
+        finding: 'MID-0005123: 97% CNP for a declared car service; avg ticket $43 vs peer $18 (2.4×)',
+        metrics: [
+          { label: 'CNP rate (in-person MCC)', observed: '97%', threshold: '>70%', triggered: true },
+          { label: 'Avg ticket vs peer', observed: '$43 vs $18 (2.4×)', threshold: '>1.5×', triggered: true },
+        ],
+      },
+    ],
   },
 
   {
     categoryId: '14-Cash',
+    ruleId: 'HT-2',
     advisoryRef: 'FIN-2014-A008',
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008',
+    advisoryTitle: 'Guidance on Recognizing Activity that May be Associated with Human Smuggling and Human Trafficking — Financial Red Flags',
     advisoryGuidance:
       'Frequent purchase or reload of prepaid cards, money orders, or repeated ATM cash advances — particularly when amounts appear structured to avoid $10,000 reporting thresholds and when combined with trafficking-adjacent MCC activity — are consistent with methods used to move and layer trafficking proceeds.',
     detectionObjective:
@@ -95,12 +151,43 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
       uniqueInsight: 'CORR-001 and CORR-002: Combined data reveals the complete cash extraction cycle — ATM withdrawal (Cap One) followed by prepaid card reload (Discover-network) at each corridor stop. Neither institution alone saw the full $3,200 per-stop cash pattern in CORR-001.',
     },
     triggeredCases: ['CORR-001', 'CORR-002', 'CTRL-001'],
+    evidence: [
+      {
+        caseId: 'CORR-001',
+        finding: 'CAP-004821: $2,200 ATM + $1,000 prepaid = $3,200 cash-equivalent (64% of total spend) across 6 corridor stops',
+        metrics: [
+          { label: 'Cash velocity ratio', observed: '64% ($3,200 / ~$5K)', threshold: '≥55%', triggered: true },
+          { label: 'ATM withdrawals (MCC 6010)', observed: '$2,200 across 6 events', threshold: 'Combined with ≥55% velocity', triggered: true },
+          { label: 'Prepaid reloads (MCC 6540)', observed: '$1,000 across 2 events', threshold: 'Combined with ≥55% velocity', triggered: true },
+        ],
+      },
+      {
+        caseId: 'CORR-002',
+        finding: 'CAP-007342: $1,200 ATM + $1,000 prepaid = $2,200 cash-equivalent (63% of total spend) across 5 corridor stops',
+        metrics: [
+          { label: 'Cash velocity ratio', observed: '63% ($2,200 / ~$3.5K)', threshold: '≥55%', triggered: true },
+          { label: 'ATM withdrawals (MCC 6010)', observed: '$1,200 across 3 events', threshold: 'Combined with ≥55% velocity', triggered: true },
+          { label: 'Prepaid reloads (MCC 6540)', observed: '$1,000 across 2 events', threshold: 'Combined with ≥55% velocity', triggered: true },
+        ],
+      },
+      {
+        caseId: 'CTRL-001',
+        finding: '9 accounts across 6 issuers: $28,400 combined cash-out over 21 days at 3 shared Atlanta merchants',
+        metrics: [
+          { label: 'Combined cash-out', observed: '$28,400 over 21 days', threshold: 'Confirmed by cross-issuer convergence', triggered: true },
+          { label: 'Cap One accounts (cash)', observed: '$14,200 (4 accounts)', threshold: 'Shared device cluster confirmed', triggered: true },
+          { label: 'Other-issuer accounts', observed: '$14,200 (5 accounts)', threshold: 'Terminal IP cross-match confirmed', triggered: true },
+        ],
+      },
+    ],
   },
 
   {
     categoryId: '14-Geo',
+    ruleId: 'HT-3',
     advisoryRef: 'FIN-2014-A008',
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008',
+    advisoryTitle: 'Guidance on Recognizing Activity that May be Associated with Human Smuggling and Human Trafficking — Financial Red Flags',
     advisoryGuidance:
       'Transactions in multiple cities or states within short timeframes, particularly along known high-trafficking corridors (I-95 Northeast, I-10 Southern, I-75 Midwest), suggest controlled geographic movement when combined with trafficking-adjacent MCC activity. Repeat appearances at the same merchant by different cardholder groups indicate a venue may be a trafficking nexus.',
     detectionObjective:
@@ -132,12 +219,34 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
       uniqueInsight: 'CORR-002: Discover identified Beaumont TX property MID-0001102 as a repeat trafficking nexus. Cap One identified CAP-007342 as a participant in that specific event. Combined: the venue is a confirmed nexus AND we have a named individual to investigate — neither view is complete alone.',
     },
     triggeredCases: ['CORR-001', 'CORR-002'],
+    evidence: [
+      {
+        caseId: 'CORR-001',
+        finding: 'CAP-004821: Boston → Providence → NYC → Philadelphia → Baltimore → DC — 6 cities in 18 days; all 5 hotel stops on I-95 Discover network',
+        metrics: [
+          { label: 'Distinct cities (21-day window)', observed: '6 cities in 18 days', threshold: '≥4 cities in ≤14 days', triggered: true },
+          { label: 'I-95 corridor segment match', observed: '6/6 stops on I-95 route', threshold: 'Route segment match', triggered: true },
+          { label: 'Discover hotel BIN clustering', observed: '8–14 cross-issuer BINs per stop', threshold: 'Multi-issuer co-occurrence', triggered: true },
+        ],
+      },
+      {
+        caseId: 'CORR-002',
+        finding: 'CAP-007342: Houston → Beaumont → New Orleans → Mobile → Jacksonville — 5 cities in 10 days on I-10 Southern; Beaumont merchant 3rd event in 45 days',
+        metrics: [
+          { label: 'Distinct cities (21-day window)', observed: '5 cities in 10 days', threshold: '≥4 cities in ≤14 days', triggered: true },
+          { label: 'I-10 corridor segment match', observed: '5/5 stops on I-10 route', threshold: 'Route segment match', triggered: true },
+          { label: 'Merchant nexus (MID-0001102)', observed: 'Beaumont, TX — 3rd distinct group in 45 days', threshold: '≥3 events in 45 days', triggered: true },
+        ],
+      },
+    ],
   },
 
   {
     categoryId: '14-Time',
+    ruleId: 'HT-4',
     advisoryRef: 'FIN-2014-A008',
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008',
+    advisoryTitle: 'Guidance on Recognizing Activity that May be Associated with Human Smuggling and Human Trafficking — Financial Red Flags',
     advisoryGuidance:
       'Transaction concentration between 10:00 PM and 4:00 AM that is inconsistent with the declared business type or normal consumer spending behavior for that merchant category is a red flag for exploitation activity. A day spa, massage parlor, or transportation service operating primarily in late-night hours is inconsistent with its declared business model.',
     detectionObjective:
@@ -168,12 +277,34 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
       uniqueInsight: 'FRONT-001 and FRONT-002: Discover identified both merchants as extreme after-hours outliers. Cap One confirmed that cardholders linked through CORR-001 also transact at these merchants in the same late-night windows — the trafficking network uses both the venues and the transport service at night.',
     },
     triggeredCases: ['FRONT-001', 'FRONT-002'],
+    evidence: [
+      {
+        caseId: 'FRONT-001',
+        finding: 'MID-0003847 (Sunrise Relaxation Spa, Las Vegas): 84% of $182K monthly volume falls between 10 PM–4 AM — 5.6× MCC 7297 peer benchmark',
+        metrics: [
+          { label: 'After-hours ratio (10 PM–4 AM)', observed: '84%', threshold: '≥2× MCC peer (~15%)', triggered: true },
+          { label: 'Peer multiple', observed: '5.6× (84% vs 15% peer)', threshold: '≥2×', triggered: true },
+          { label: 'Zero-daytime days', observed: '6 of 14 days — no transactions 9 AM–7 PM', threshold: 'Declared business hours', triggered: true },
+        ],
+      },
+      {
+        caseId: 'FRONT-002',
+        finding: 'MID-0005123 (Express Transportation LLC, Miami): 79% of $94K monthly volume falls between 10 PM–5 AM — 4.4× MCC 4121 peer benchmark',
+        metrics: [
+          { label: 'After-hours ratio (10 PM–5 AM)', observed: '79%', threshold: '≥2× MCC peer (~18%)', triggered: true },
+          { label: 'Peer multiple', observed: '4.4× (79% vs 18% peer)', threshold: '≥2×', triggered: true },
+          { label: 'Night-hour dollar volume', observed: '$74,260 of $94K/month after 10 PM', threshold: 'Absolute + relative threshold', triggered: true },
+        ],
+      },
+    ],
   },
 
   {
     categoryId: '20-T2',
+    ruleId: 'HT-5',
     advisoryRef: 'FIN-2020-A008, Typology 2',
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008',
+    advisoryTitle: 'Supplemental Advisory on Identifying and Reporting Human Trafficking and Related Activity',
     advisoryGuidance:
       'Typology 2 describes trafficking proceeds laundered through seemingly legitimate businesses — entities whose transaction volume, ticket size, card-not-present rate, or chargeback profile is inconsistent with their declared business type. Zero chargebacks over extended periods for personal services businesses, and CNP-dominant transaction profiles for declared in-person service businesses, are specific red flags. Cross-referencing the legal entity behind a flagged merchant against commercial credit databases is critical.',
     detectionObjective:
@@ -205,12 +336,39 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
       uniqueInsight: 'FRONT-001: Discover identified the transaction impossibility. Cap One identified $750K commercial exposure to the same entity. Neither institution knew the other had a relationship with "Sunrise Wellness Group LLC." Combined: front business confirmed + credit facility risk quantified in one joint alert.',
     },
     triggeredCases: ['FRONT-001', 'FRONT-002'],
+    evidence: [
+      {
+        caseId: 'FRONT-001',
+        finding: 'MID-0003847: All 4 front-business flags simultaneously triggered. Cap One commercial match to Sunrise Wellness Group LLC (COMM-00312) identified $750K credit exposure.',
+        metrics: [
+          { label: 'Volume vs MCC 7297 peer', observed: '$182K vs $28K (6.5×)', threshold: '>2.5× peer median', triggered: true },
+          { label: 'Card-not-present rate', observed: '91%', threshold: '>70% for in-person MCC', triggered: true },
+          { label: 'Chargeback rate (14 months)', observed: '0.00%', threshold: '<0.2% (absence anomaly)', triggered: true },
+          { label: 'After-hours volume', observed: '84%', threshold: '>2× MCC peer', triggered: true },
+          { label: 'Front-business score', observed: '4/4 flags → immediate escalation', threshold: '≥3/4', triggered: true },
+          { label: 'Commercial credit match', observed: '$750K facility — Sunrise Wellness Group LLC', threshold: 'Any commercial match', triggered: true },
+        ],
+      },
+      {
+        caseId: 'FRONT-002',
+        finding: 'MID-0005123: 3 of 4 front-business flags triggered. No Cap One commercial relationship, but 3 cardholders cross-reference to CORR-001 active SAR.',
+        metrics: [
+          { label: 'Volume vs MCC 4121 peer', observed: '$94K vs $31K (3.0×)', threshold: '>2.5× peer median', triggered: true },
+          { label: 'Card-not-present rate', observed: '97%', threshold: '>70% for in-person MCC', triggered: true },
+          { label: 'Chargeback rate', observed: '0.20%', threshold: '<0.2% (marginal)', triggered: false },
+          { label: 'After-hours volume', observed: '79%', threshold: '>2× MCC peer', triggered: true },
+          { label: 'Front-business score', observed: '3/4 flags → escalation', threshold: '≥3/4', triggered: true },
+        ],
+      },
+    ],
   },
 
   {
     categoryId: '20-T3',
+    ruleId: 'HT-6',
     advisoryRef: 'FIN-2020-A008, Typology 3',
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008',
+    advisoryTitle: 'Supplemental Advisory on Identifying and Reporting Human Trafficking and Related Activity',
     advisoryGuidance:
       'Typology 3 describes multi-account controllers and money mule networks — a single individual managing multiple accounts across institutions, or funds rapidly transferred to third parties with no apparent relationship. Shared device fingerprints across accounts from different named customers, and multiple cards from different issuing banks converging at the same merchant within narrow time windows, are specific red flags for a controller operating a mule network.',
     detectionObjective:
@@ -242,5 +400,19 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
       uniqueInsight: 'CTRL-001: Cap One had the device/IP signal (4 accounts, 1 controller). Discover had the multi-issuer convergence signal (9 accounts, 3 merchants). The terminal IP cross-match is the bridge — the same IP address appears in two completely separate data systems from two institutions, confirming a single controller is operating all nine accounts.',
     },
     triggeredCases: ['CTRL-001'],
+    evidence: [
+      {
+        caseId: 'CTRL-001',
+        finding: 'Device FP-7a3c9d2e1b4f8a0c links 4 Cap One accounts; session IP 192.168.44.17 cross-matched to Discover terminals at MID-0001872 and MID-0002341 — one controller, nine cards, six banks, $28,400 cash-out',
+        metrics: [
+          { label: 'Device fingerprint cluster (Cap One)', observed: '4 accounts share FP-7a3c9d2e1b4f8a0c', threshold: '≥3 accounts', triggered: true },
+          { label: 'Session IP (Cap One auth logs)', observed: '192.168.44.17 across 3 accounts', threshold: 'Same IP, multiple accounts', triggered: true },
+          { label: 'Terminal IP cross-match (Discover)', observed: '192.168.44.17 at MID-0001872 + MID-0002341', threshold: 'Session IP = terminal IP', triggered: true },
+          { label: 'Multi-BIN convergence', observed: '6 issuers: Cap One, Discover, Chase, WF, US Bank, Citi', threshold: '≥6 distinct issuers', triggered: true },
+          { label: 'Shared merchant windows', observed: '3 merchants, 7 separate nights, 90-min windows', threshold: '≥3 nights confirmed', triggered: true },
+          { label: 'Combined cash-out', observed: '$28,400 over 21 days (9 accounts)', threshold: 'Controller network confirmed', triggered: true },
+        ],
+      },
+    ],
   },
 ]
