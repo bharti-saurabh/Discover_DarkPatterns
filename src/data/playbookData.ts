@@ -22,6 +22,15 @@ export interface CaseEvidence {
   metrics: EvidenceMetric[]
 }
 
+export interface DetectionScript {
+  language: 'sql' | 'python'
+  altLanguage: 'sql' | 'python'
+  tables: Array<{ name: string; source: 'capone' | 'discover' | 'combined' }>
+  code: string
+  altCode: string
+  classification: { flagged: string; review: string; pass: string }
+}
+
 export interface PlaybookRule {
   categoryId: string
   ruleId: string
@@ -37,6 +46,7 @@ export interface PlaybookRule {
   combined: { capability: string; uniqueInsight: string }
   triggeredCases: string[]
   evidence: CaseEvidence[]
+  script: DetectionScript
 }
 
 export const PLAYBOOK_RULES: PlaybookRule[] = [
@@ -47,7 +57,7 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008',
     advisoryTitle: 'Guidance on Recognizing Activity that May be Associated with Human Smuggling and Human Trafficking — Financial Red Flags',
     advisoryGuidance:
-      'Financial institutions should identify transactions at hotels, motels, massage parlors, escort services, rideshare providers, and adult entertainment venues — especially when multiple indicators cluster at the same merchant or geographic area over a concentrated time period. Absence of ordinary consumer spending (grocery, dining, retail) alongside trafficking-adjacent MCC concentration is itself a red flag.',
+      'FIN-2014-A008 identifies transactions at hotels, motels, massage parlors, escort services, and adult entertainment venues as red flags — particularly when multiple indicators cluster at the same merchant or geographic area. The absence of ordinary consumer spending patterns alongside concentration in these merchant categories is itself a financial red flag.',
     detectionObjective:
       'Identify cardholders whose spend is dominated by trafficking-adjacent MCCs and detect clustering of multiple cards from different issuers at the same merchant locations.',
     computationalSteps: [
@@ -113,6 +123,111 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
         ],
       },
     ],
+    script: {
+      language: 'sql',
+      tables: [
+        { name: 'capone.transactions', source: 'capone' },
+        { name: 'discover.authorizations', source: 'discover' },
+        { name: 'combined.merchant_map', source: 'combined' },
+      ],
+      code: `-- ① Cap One: per-cardholder trafficking-MCC ratio (rolling 30 days)
+WITH mcc_ratio AS (
+  SELECT cardholder_id,
+    ROUND(
+      SUM(amount) FILTER (WHERE mcc IN ('7011','4121','6540','6010','7297','7299'))
+      / NULLIF(SUM(amount), 0), 3
+    ) AS ht_ratio
+  FROM capone.transactions
+  WHERE txn_ts >= NOW() - INTERVAL '30 days'
+  GROUP BY cardholder_id
+),
+-- ② Cap One: hotel → cash/prepaid sequence within same city, 4-hour window
+sequences AS (
+  SELECT h.cardholder_id, COUNT(*) AS seq_count
+  FROM capone.transactions h
+  JOIN capone.transactions c
+    ON  h.cardholder_id = c.cardholder_id AND h.city = c.city
+    AND h.mcc = '7011' AND c.mcc IN ('6010','6540')
+    AND c.txn_ts BETWEEN h.txn_ts AND h.txn_ts + INTERVAL '4 hours'
+  WHERE h.txn_ts >= NOW() - INTERVAL '30 days'
+  GROUP BY h.cardholder_id
+),
+-- ③ Discover: peak cross-issuer BIN count per merchant per 4-hr window
+bin_clusters AS (
+  SELECT mm.capone_mid,
+    MAX(COUNT(DISTINCT LEFT(bin, 6)))
+      OVER (PARTITION BY da.merchant_id) AS peak_bins
+  FROM discover.authorizations da
+  JOIN combined.merchant_map mm ON mm.discover_mid = da.merchant_id
+  WHERE auth_ts >= NOW() - INTERVAL '30 days'
+  GROUP BY mm.capone_mid, da.merchant_id, DATE_TRUNC('hour', auth_ts)
+)
+-- ④ Join all signals and classify
+SELECT r.cardholder_id, r.ht_ratio,
+  COALESCE(s.seq_count, 0)  AS hotel_cash_sequences,
+  COALESCE(bc.peak_bins, 0) AS peak_cross_issuer_bins,
+  CASE
+    WHEN r.ht_ratio > 0.70 AND COALESCE(s.seq_count, 0) >= 2 THEN 'FLAGGED'
+    WHEN COALESCE(bc.peak_bins, 0) >= 8                       THEN 'FLAGGED'
+    WHEN r.ht_ratio > 0.50                                    THEN 'REVIEW'
+    ELSE 'PASS'
+  END AS ht1_status
+FROM mcc_ratio r
+LEFT JOIN sequences s  ON s.cardholder_id = r.cardholder_id
+LEFT JOIN capone.transactions t ON t.cardholder_id = r.cardholder_id
+LEFT JOIN bin_clusters bc ON bc.capone_mid = t.merchant_id
+GROUP BY r.cardholder_id, r.ht_ratio, s.seq_count, bc.peak_bins
+ORDER BY r.ht_ratio DESC;`,
+      altLanguage: 'python',
+      altCode: `import pandas as pd
+from sqlalchemy import create_engine
+engine  = create_engine("postgresql+psycopg2://user:pass@host/db")
+HT_MCCS = {'7011','4121','6540','6010','7297','7299'}
+
+# ① Cap One: trafficking-MCC ratio per cardholder (rolling 30 days)
+txns = pd.read_sql(
+    "SELECT cardholder_id, mcc, amount, txn_ts, city, merchant_id "
+    "FROM capone.transactions WHERE txn_ts >= NOW() - INTERVAL '30 days'",
+    engine, parse_dates=['txn_ts'])
+mcc_ratio = (txns.assign(is_ht=txns.mcc.isin(HT_MCCS))
+    .groupby('cardholder_id')
+    .apply(lambda g: g.loc[g.is_ht,'amount'].sum() / g.amount.sum())
+    .rename('ht_ratio').reset_index())
+
+# ② Cap One: hotel → cash sequence within same city, ≤4 hours
+hotels = txns[txns.mcc=='7011'][['cardholder_id','city','txn_ts']].rename(columns={'txn_ts':'h_ts'})
+cash   = txns[txns.mcc.isin({'6010','6540'})][['cardholder_id','city','txn_ts']].rename(columns={'txn_ts':'c_ts'})
+seqs   = (hotels.merge(cash, on=['cardholder_id','city'])
+    .pipe(lambda d: d[(d.c_ts - d.h_ts).dt.total_seconds().between(0, 14400)])
+    .groupby('cardholder_id').size().rename('seq_count').reset_index())
+
+# ③ Discover: peak cross-issuer BIN count per merchant per 4-hr window
+auths = pd.read_sql(
+    "SELECT mm.capone_mid AS mid, LEFT(da.bin,6) AS bin6, "
+    "DATE_TRUNC('hour', da.auth_ts) AS hr "
+    "FROM discover.authorizations da "
+    "JOIN combined.merchant_map mm ON mm.discover_mid = da.merchant_id "
+    "WHERE da.auth_ts >= NOW() - INTERVAL '30 days'", engine)
+peak_bins = (auths.groupby(['mid','hr']).bin6.nunique()
+    .groupby('mid').max().rename('peak_bins').reset_index())
+
+# ④ Join and classify
+result = mcc_ratio.merge(seqs, on='cardholder_id', how='left').fillna({'seq_count': 0})
+m2c    = txns[['cardholder_id','merchant_id']].drop_duplicates()
+result = (result.merge(m2c, on='cardholder_id', how='left')
+    .merge(peak_bins.rename(columns={'mid':'merchant_id'}), on='merchant_id', how='left')
+    .fillna({'peak_bins': 0}))
+result['ht1_status'] = result.apply(lambda r: (
+    'FLAGGED' if (r.ht_ratio > 0.70 and r.seq_count >= 2) or r.peak_bins >= 8
+    else 'REVIEW' if r.ht_ratio > 0.50 else 'PASS'), axis=1)
+print(result[['cardholder_id','ht_ratio','seq_count','peak_bins','ht1_status']]
+      .sort_values('ht_ratio', ascending=False))`,
+      classification: {
+        flagged: 'ht_ratio > 0.70 AND sequences ≥ 2  OR  peak cross-issuer BINs ≥ 8',
+        review:  'ht_ratio > 0.50 with no confirmed sequence or clustering',
+        pass:    'ht_ratio ≤ 0.50 and no high-BIN clustering at shared merchants',
+      },
+    },
   },
 
   {
@@ -122,7 +237,7 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008',
     advisoryTitle: 'Guidance on Recognizing Activity that May be Associated with Human Smuggling and Human Trafficking — Financial Red Flags',
     advisoryGuidance:
-      'Frequent purchase or reload of prepaid cards, money orders, or repeated ATM cash advances — particularly when amounts appear structured to avoid $10,000 reporting thresholds and when combined with trafficking-adjacent MCC activity — are consistent with methods used to move and layer trafficking proceeds.',
+      'FIN-2014-A008 identifies frequent purchase or reload of prepaid access cards, money orders, or ATM cash advances as red flags — particularly when amounts appear structured to avoid the $10,000 CTR threshold and when combined with trafficking-adjacent merchant activity.',
     detectionObjective:
       'Identify cardholders with high cash-equivalent velocity (ATM withdrawals + prepaid reloads) correlated with geographic corridor stops, and detect structuring patterns below CTR thresholds.',
     computationalSteps: [
@@ -180,6 +295,115 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
         ],
       },
     ],
+    script: {
+      language: 'sql',
+      tables: [
+        { name: 'capone.transactions', source: 'capone' },
+        { name: 'discover.authorizations', source: 'discover' },
+        { name: 'combined.merchant_map', source: 'combined' },
+      ],
+      code: `-- ① Cap One: ATM + prepaid cash velocity per cardholder (rolling 30 days)
+WITH cash_summary AS (
+  SELECT cardholder_id,
+    SUM(amount) FILTER (WHERE mcc = '6010')  AS atm_total,
+    SUM(amount) FILTER (WHERE mcc = '6540')  AS prepaid_total,
+    ROUND(
+      SUM(amount) FILTER (WHERE mcc IN ('6010','6540'))
+      / NULLIF(SUM(amount), 0), 3
+    ) AS cash_velocity
+  FROM capone.transactions
+  WHERE txn_ts >= NOW() - INTERVAL '30 days'
+  GROUP BY cardholder_id
+),
+-- ② Cap One: structuring — 3+ cash txns $3K–$9.9K within any 7-day window
+structuring AS (
+  SELECT DISTINCT cardholder_id FROM (
+    SELECT cardholder_id,
+      COUNT(*) OVER (
+        PARTITION BY cardholder_id ORDER BY txn_ts
+        RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW
+      ) AS rolling_count
+    FROM capone.transactions
+    WHERE mcc IN ('6010','6540')
+      AND amount BETWEEN 3000 AND 9900
+      AND txn_ts >= NOW() - INTERVAL '30 days'
+  ) w WHERE rolling_count >= 3
+),
+-- ③ Discover: prepaid reload volume at the cardholder's merchant stops
+discover_prepaid AS (
+  SELECT mm.capone_mid, COUNT(*) AS prepaid_hits
+  FROM discover.authorizations da
+  JOIN combined.merchant_map mm ON mm.discover_mid = da.merchant_id
+  WHERE da.mcc = '6540' AND da.auth_ts >= NOW() - INTERVAL '30 days'
+  GROUP BY mm.capone_mid
+)
+-- ④ Join and classify
+SELECT cs.cardholder_id, cs.atm_total, cs.prepaid_total, cs.cash_velocity,
+  (st.cardholder_id IS NOT NULL)       AS structuring_flag,
+  COALESCE(SUM(dp.prepaid_hits), 0)    AS discover_prepaid_at_stops,
+  CASE
+    WHEN cs.cash_velocity >= 0.55      THEN 'FLAGGED'
+    WHEN st.cardholder_id IS NOT NULL  THEN 'FLAGGED'
+    WHEN cs.cash_velocity >= 0.40      THEN 'REVIEW'
+    ELSE 'PASS'
+  END AS ht2_status
+FROM cash_summary cs
+LEFT JOIN structuring st USING (cardholder_id)
+LEFT JOIN capone.transactions t USING (cardholder_id)
+LEFT JOIN discover_prepaid dp ON dp.capone_mid = t.merchant_id
+GROUP BY cs.cardholder_id, cs.atm_total, cs.prepaid_total,
+         cs.cash_velocity, st.cardholder_id
+ORDER BY cs.cash_velocity DESC NULLS LAST;`,
+      altLanguage: 'python',
+      altCode: `import pandas as pd
+from sqlalchemy import create_engine
+engine = create_engine("postgresql+psycopg2://user:pass@host/db")
+
+# ① Cap One: ATM + prepaid cash velocity per cardholder (rolling 30 days)
+txns = pd.read_sql(
+    "SELECT cardholder_id, mcc, amount, txn_ts, merchant_id "
+    "FROM capone.transactions WHERE txn_ts >= NOW() - INTERVAL '30 days'",
+    engine, parse_dates=['txn_ts'])
+cash_summary = (txns.groupby('cardholder_id').apply(lambda g: pd.Series({
+    'atm_total':     g.loc[g.mcc=='6010','amount'].sum(),
+    'prepaid_total': g.loc[g.mcc=='6540','amount'].sum(),
+    'cash_velocity': g.loc[g.mcc.isin({'6010','6540'}),'amount'].sum() / g.amount.sum().clip(lower=1)
+})).reset_index())
+
+# ② Cap One: structuring — 3+ cash txns $3K–$9.9K within any 7-day window
+cash_txns = txns[txns.mcc.isin({'6010','6540'}) & txns.amount.between(3000, 9900)].sort_values('txn_ts')
+def has_structuring(g):
+    for _, row in g.iterrows():
+        if len(g[(g.txn_ts >= row.txn_ts) & (g.txn_ts <= row.txn_ts + pd.Timedelta('7D'))]) >= 3:
+            return True
+    return False
+structuring = cash_txns.groupby('cardholder_id').apply(has_structuring).rename('structuring_flag').reset_index()
+
+# ③ Discover: prepaid reloads at the same merchant stops
+disc_prepaid = pd.read_sql(
+    "SELECT mm.capone_mid AS mid, COUNT(*) AS prepaid_hits "
+    "FROM discover.authorizations da "
+    "JOIN combined.merchant_map mm ON mm.discover_mid = da.merchant_id "
+    "WHERE da.mcc='6540' AND da.auth_ts >= NOW()-INTERVAL '30 days' "
+    "GROUP BY mm.capone_mid", engine)
+
+# ④ Join and classify
+result = cash_summary.merge(structuring, on='cardholder_id', how='left').fillna({'structuring_flag': False})
+m2c    = txns[['cardholder_id','merchant_id']].drop_duplicates()
+result = (result.merge(m2c, on='cardholder_id', how='left')
+    .merge(disc_prepaid.rename(columns={'mid':'merchant_id'}), on='merchant_id', how='left')
+    .fillna({'prepaid_hits': 0}))
+result['ht2_status'] = result.apply(lambda r: (
+    'FLAGGED' if r.cash_velocity >= 0.55 or r.structuring_flag
+    else 'REVIEW' if r.cash_velocity >= 0.40 else 'PASS'), axis=1)
+print(result[['cardholder_id','atm_total','prepaid_total','cash_velocity','structuring_flag','ht2_status']]
+      .sort_values('cash_velocity', ascending=False))`,
+      classification: {
+        flagged: 'cash_velocity ≥ 0.55  OR  structuring_flag = true (3+ txns $3K–$9.9K in 7 days)',
+        review:  'cash_velocity ≥ 0.40 and no structuring pattern detected',
+        pass:    'cash_velocity < 0.40 and no structured cash transactions',
+      },
+    },
   },
 
   {
@@ -189,7 +413,7 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008',
     advisoryTitle: 'Guidance on Recognizing Activity that May be Associated with Human Smuggling and Human Trafficking — Financial Red Flags',
     advisoryGuidance:
-      'Transactions in multiple cities or states within short timeframes, particularly along known high-trafficking corridors (I-95 Northeast, I-10 Southern, I-75 Midwest), suggest controlled geographic movement when combined with trafficking-adjacent MCC activity. Repeat appearances at the same merchant by different cardholder groups indicate a venue may be a trafficking nexus.',
+      'FIN-2014-A008 flags customers who frequently appear to move through and transact from multiple cities or states within short timeframes, especially when combined with trafficking-adjacent MCC activity at each stop. Repeat appearances at the same merchant location by multiple different cardholder groups indicate the venue may be a trafficking nexus.',
     detectionObjective:
       'Map cardholder movement sequences to known trafficking corridors, detect multi-city patterns inconsistent with ordinary travel, and identify merchants that repeatedly host different cardholder groups.',
     computationalSteps: [
@@ -239,6 +463,116 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
         ],
       },
     ],
+    script: {
+      language: 'sql',
+      altLanguage: 'python',
+      tables: [
+        { name: 'capone.transactions', source: 'capone' },
+        { name: 'capone.cardholders', source: 'capone' },
+        { name: 'discover.authorizations', source: 'discover' },
+        { name: 'combined.merchant_map', source: 'combined' },
+        { name: 'combined.city_distances', source: 'combined' },
+      ],
+      code: `-- ① Cap One: per-cardholder movement summary (rolling 21 days)
+WITH movement AS (
+  SELECT cardholder_id,
+    COUNT(DISTINCT city || ',' || state)         AS distinct_cities,
+    EXTRACT(DAY FROM MAX(txn_ts) - MIN(txn_ts))  AS travel_days
+  FROM capone.transactions
+  WHERE txn_ts >= NOW() - INTERVAL '21 days'
+  GROUP BY cardholder_id
+),
+-- ② Cap One: impossible-travel — same cardholder, same day, cities >200 miles apart
+impossible AS (
+  SELECT a.cardholder_id, COUNT(*) AS impossible_events
+  FROM capone.transactions a
+  JOIN capone.transactions b
+    ON  a.cardholder_id = b.cardholder_id
+    AND DATE(a.txn_ts) = DATE(b.txn_ts) AND a.city <> b.city
+  JOIN combined.city_distances cd
+    ON cd.city_a = a.city AND cd.city_b = b.city
+    AND cd.distance_miles > 200
+  WHERE a.txn_ts >= NOW() - INTERVAL '21 days'
+  GROUP BY a.cardholder_id
+),
+-- ③ Discover: venue nexus — same merchant hosted 3+ distinct groups in 45 days
+venue_nexus AS (
+  SELECT mm.capone_mid
+  FROM discover.authorizations da
+  JOIN combined.merchant_map mm ON mm.discover_mid = da.merchant_id
+  WHERE da.auth_ts >= NOW() - INTERVAL '45 days'
+  GROUP BY mm.capone_mid, DATE_TRUNC('week', da.auth_ts)
+  HAVING COUNT(DISTINCT LEFT(da.bin, 6)) >= 3
+)
+-- ④ Join and classify
+SELECT m.cardholder_id, m.distinct_cities, m.travel_days,
+  COALESCE(i.impossible_events, 0)  AS impossible_travel_events,
+  COUNT(DISTINCT vn.capone_mid)     AS nexus_venues_visited,
+  CASE
+    WHEN m.distinct_cities >= 4 AND m.travel_days <= 14 THEN 'FLAGGED'
+    WHEN COALESCE(i.impossible_events, 0) >= 1          THEN 'FLAGGED'
+    WHEN m.distinct_cities >= 3                         THEN 'REVIEW'
+    ELSE 'PASS'
+  END AS ht3_status
+FROM movement m
+LEFT JOIN impossible i USING (cardholder_id)
+LEFT JOIN capone.transactions t USING (cardholder_id)
+LEFT JOIN venue_nexus vn ON vn.capone_mid = t.merchant_id
+GROUP BY m.cardholder_id, m.distinct_cities, m.travel_days, i.impossible_events
+ORDER BY m.distinct_cities DESC;`,
+      altCode: `import pandas as pd
+from geopy.distance import geodesic
+from sqlalchemy import create_engine
+engine   = create_engine("postgresql+psycopg2://user:pass@host/db")
+
+# ① Cap One: per-cardholder movement summary (rolling 21 days)
+txns = pd.read_sql(
+    "SELECT cardholder_id, city, state, txn_ts, merchant_id "
+    "FROM capone.transactions WHERE txn_ts >= NOW() - INTERVAL '21 days'",
+    engine, parse_dates=['txn_ts'])
+movement = (txns.groupby('cardholder_id')
+    .agg(distinct_cities=('city','nunique'),
+         travel_days=('txn_ts', lambda x: (x.max()-x.min()).days))
+    .reset_index())
+
+# ② Cap One: impossible-travel — same cardholder, same day, cities > 200 miles
+city_coords = pd.read_sql("SELECT city, lat, lon FROM combined.city_distances", engine)
+city_ll = dict(zip(city_coords.city, zip(city_coords.lat, city_coords.lon)))
+def impossible_travel(g):
+    g['date'] = g.txn_ts.dt.date
+    count = 0
+    for _, grp in g.groupby('date'):
+        cities = grp['city'].unique()
+        for i, c1 in enumerate(cities):
+            for c2 in cities[i+1:]:
+                if c1 in city_ll and c2 in city_ll:
+                    if geodesic(city_ll[c1], city_ll[c2]).miles > 200:
+                        count += 1
+    return count
+imp = txns.groupby('cardholder_id').apply(impossible_travel).rename('impossible_events').reset_index()
+
+# ③ Discover: venue nexus — merchant hosted 3+ distinct BIN groups in 45 days
+venue_nexus = pd.read_sql(
+    "SELECT mm.capone_mid FROM discover.authorizations da "
+    "JOIN combined.merchant_map mm ON mm.discover_mid=da.merchant_id "
+    "WHERE da.auth_ts >= NOW()-INTERVAL '45 days' "
+    "GROUP BY mm.capone_mid, DATE_TRUNC('week',da.auth_ts) "
+    "HAVING COUNT(DISTINCT LEFT(da.bin,6)) >= 3", engine)
+nexus_mids = set(venue_nexus.capone_mid)
+
+# ④ Join and classify
+result = movement.merge(imp, on='cardholder_id', how='left').fillna({'impossible_events': 0})
+result['ht3_status'] = result.apply(lambda r: (
+    'FLAGGED' if (r.distinct_cities >= 4 and r.travel_days <= 14) or r.impossible_events >= 1
+    else 'REVIEW' if r.distinct_cities >= 3 else 'PASS'), axis=1)
+print(result[['cardholder_id','distinct_cities','travel_days','impossible_events','ht3_status']]
+      .sort_values('distinct_cities', ascending=False))`,
+      classification: {
+        flagged: '≥ 4 distinct cities in ≤ 14 days  OR  impossible-travel event detected',
+        review:  '3 cities in 21-day window (elevated but below threshold)',
+        pass:    '≤ 2 distinct cities OR travel span > 14 days',
+      },
+    },
   },
 
   {
@@ -248,7 +582,7 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008',
     advisoryTitle: 'Guidance on Recognizing Activity that May be Associated with Human Smuggling and Human Trafficking — Financial Red Flags',
     advisoryGuidance:
-      'Transaction concentration between 10:00 PM and 4:00 AM that is inconsistent with the declared business type or normal consumer spending behavior for that merchant category is a red flag for exploitation activity. A day spa, massage parlor, or transportation service operating primarily in late-night hours is inconsistent with its declared business model.',
+      'FIN-2014-A008 identifies transactional activity that largely occurs outside of normal business operating hours as a red flag — for example, an establishment that operates during the day having a large number of transactions at night. A spa, massage parlor, or transportation service with activity concentrated in late-night hours is inconsistent with its declared business model.',
     detectionObjective:
       'Identify merchants with after-hours transaction profiles that are statistically inconsistent with their declared MCC peer group, and identify cardholders whose spending is systematically concentrated in late-night hours at trafficking-adjacent merchants.',
     computationalSteps: [
@@ -297,16 +631,118 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
         ],
       },
     ],
+    script: {
+      language: 'sql',
+      altLanguage: 'python',
+      tables: [
+        { name: 'discover.authorizations', source: 'discover' },
+        { name: 'discover.merchants', source: 'discover' },
+        { name: 'capone.transactions', source: 'capone' },
+      ],
+      code: `-- ① Discover: per-merchant after-hours ratio (22:00–04:00) vs MCC peer
+WITH merchant_hours AS (
+  SELECT da.merchant_id, dm.mcc, dm.name, dm.declared_hours_open,
+    COUNT(*) FILTER (
+      WHERE EXTRACT(HOUR FROM da.auth_ts) >= 22
+         OR EXTRACT(HOUR FROM da.auth_ts) <  4
+    )::FLOAT / NULLIF(COUNT(*), 0) AS night_ratio,
+    COUNT(*) AS total_auths
+  FROM discover.authorizations da
+  JOIN discover.merchants dm USING (merchant_id)
+  WHERE da.auth_ts >= NOW() - INTERVAL '30 days'
+    AND dm.mcc IN ('7011','7297','7299','4121')
+  GROUP BY da.merchant_id, dm.mcc, dm.name, dm.declared_hours_open
+),
+-- ② Discover: MCC peer night-ratio baseline
+peer_bench AS (
+  SELECT mcc, AVG(night_ratio) AS peer_night_ratio
+  FROM merchant_hours
+  GROUP BY mcc
+),
+-- ③ Cap One: cardholder after-hours spend ratio at trafficking MCCs
+card_hours AS (
+  SELECT cardholder_id,
+    COUNT(*) FILTER (
+      WHERE (EXTRACT(HOUR FROM txn_ts) >= 22 OR EXTRACT(HOUR FROM txn_ts) < 4)
+        AND mcc IN ('7011','7297','7299','4121')
+    )::FLOAT / NULLIF(COUNT(*), 0) AS ch_night_ratio
+  FROM capone.transactions
+  WHERE txn_ts >= NOW() - INTERVAL '30 days'
+  GROUP BY cardholder_id
+)
+-- ④ Score merchants; join cardholder night-ratio for compounded signal
+SELECT mh.merchant_id, mh.name, mh.mcc,
+  ROUND(mh.night_ratio::NUMERIC, 3)                                      AS night_ratio,
+  ROUND(pb.peer_night_ratio::NUMERIC, 3)                                 AS peer_ratio,
+  ROUND((mh.night_ratio / NULLIF(pb.peer_night_ratio,0))::NUMERIC, 1)   AS peer_multiple,
+  CASE
+    WHEN mh.night_ratio / NULLIF(pb.peer_night_ratio, 0) >= 2.0 THEN 'FLAGGED'
+    WHEN mh.night_ratio / NULLIF(pb.peer_night_ratio, 0) >= 1.5 THEN 'REVIEW'
+    ELSE 'PASS'
+  END AS ht4_status
+FROM merchant_hours mh
+JOIN peer_bench pb USING (mcc)
+WHERE mh.total_auths >= 50   -- exclude thin-data merchants
+ORDER BY peer_multiple DESC;`,
+      altCode: `import pandas as pd
+from sqlalchemy import create_engine
+engine      = create_engine("postgresql+psycopg2://user:pass@host/db")
+HT_MCCS     = {'7011','7297','7299','4121'}
+NIGHT_HOURS = set(range(22, 24)) | set(range(0, 4))
+
+# ① Discover: per-merchant after-hours ratio vs MCC peer
+auths = pd.read_sql(
+    "SELECT da.merchant_id, dm.mcc, dm.name, da.auth_ts "
+    "FROM discover.authorizations da "
+    "JOIN discover.merchants dm USING (merchant_id) "
+    "WHERE da.auth_ts >= NOW() - INTERVAL '30 days' "
+    "AND dm.mcc IN ('7011','7297','7299','4121')",
+    engine, parse_dates=['auth_ts'])
+auths['is_night'] = auths.auth_ts.dt.hour.isin(NIGHT_HOURS)
+merch_ratios = (auths.groupby(['merchant_id','mcc','name'])
+    .apply(lambda g: pd.Series({
+        'night_ratio': g.is_night.sum() / max(len(g), 1),
+        'total_auths':  len(g)}))
+    .reset_index())
+
+# ② MCC peer benchmark — average night ratio per MCC
+peer = merch_ratios.groupby('mcc').night_ratio.mean().rename('peer_ratio').reset_index()
+merch_ratios = merch_ratios.merge(peer, on='mcc')
+merch_ratios['peer_multiple'] = (merch_ratios.night_ratio
+    / merch_ratios.peer_ratio.clip(lower=1e-6))
+
+# ③ Cap One: cardholder after-hours spend at trafficking MCCs
+txns = pd.read_sql(
+    "SELECT cardholder_id, mcc, txn_ts FROM capone.transactions "
+    "WHERE txn_ts >= NOW() - INTERVAL '30 days'",
+    engine, parse_dates=['txn_ts'])
+txns['is_night_ht'] = txns.txn_ts.dt.hour.isin(NIGHT_HOURS) & txns.mcc.isin(HT_MCCS)
+card_night = (txns.groupby('cardholder_id')
+    .apply(lambda g: g.is_night_ht.sum() / max(len(g), 1))
+    .rename('ch_night_ratio').reset_index())
+
+# ④ Classify merchants (exclude thin-data merchants < 50 auths)
+subset = merch_ratios[merch_ratios.total_auths >= 50].copy()
+subset['ht4_status'] = subset.peer_multiple.map(
+    lambda m: 'FLAGGED' if m >= 2.0 else 'REVIEW' if m >= 1.5 else 'PASS')
+print(subset[['merchant_id','name','night_ratio','peer_ratio','peer_multiple','ht4_status']]
+      .sort_values('peer_multiple', ascending=False))`,
+      classification: {
+        flagged: 'night_ratio ≥ 2.0× MCC peer benchmark (e.g. 84% vs 15% peer = 5.6×)',
+        review:  'night_ratio 1.5×–2.0× peer benchmark — elevated, needs investigation',
+        pass:    'night_ratio < 1.5× peer  OR  fewer than 50 authorizations in window',
+      },
+    },
   },
 
   {
-    categoryId: '20-T2',
+    categoryId: '20-T1',
     ruleId: 'HT-5',
-    advisoryRef: 'FIN-2020-A008, Typology 2',
+    advisoryRef: 'FIN-2020-A008, Typology 1',
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008',
     advisoryTitle: 'Supplemental Advisory on Identifying and Reporting Human Trafficking and Related Activity',
     advisoryGuidance:
-      'Typology 2 describes trafficking proceeds laundered through seemingly legitimate businesses — entities whose transaction volume, ticket size, card-not-present rate, or chargeback profile is inconsistent with their declared business type. Zero chargebacks over extended periods for personal services businesses, and CNP-dominant transaction profiles for declared in-person service businesses, are specific red flags. Cross-referencing the legal entity behind a flagged merchant against commercial credit databases is critical.',
+      'FIN-2020-A008 Typology 1 (Front Companies) describes licit and illicit businesses used to conceal human trafficking and launder its proceeds — including massage parlors, nail salons, bars, restaurants, and spas. Indicators include transaction volume, hours, or customer profile inconsistent with the declared business type and location.',
     detectionObjective:
       'Identify merchant accounts where multiple anomaly indicators simultaneously point to a front business, and cross-reference the merchant\'s legal entity against commercial credit relationships at other institutions.',
     computationalSteps: [
@@ -361,6 +797,118 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
         ],
       },
     ],
+    script: {
+      language: 'sql',
+      altLanguage: 'python',
+      tables: [
+        { name: 'discover.authorizations', source: 'discover' },
+        { name: 'discover.merchants', source: 'discover' },
+        { name: 'discover.chargebacks', source: 'discover' },
+        { name: 'capone.commercial_accounts', source: 'capone' },
+        { name: 'combined.merchant_map', source: 'combined' },
+      ],
+      code: `-- ① Discover: merchant transaction signals (volume, CNP rate)
+WITH merchant_signals AS (
+  SELECT da.merchant_id, dm.name, dm.mcc,
+    SUM(da.amount)                                              AS monthly_volume,
+    dm.peer_monthly_median,
+    ROUND(SUM(da.amount) / NULLIF(dm.peer_monthly_median, 0), 2) AS volume_multiple,
+    ROUND(AVG(da.is_cnp::INT)::NUMERIC, 3)                     AS cnp_rate
+  FROM discover.authorizations da
+  JOIN discover.merchants dm USING (merchant_id)
+  WHERE da.auth_ts >= NOW() - INTERVAL '30 days'
+    AND dm.mcc IN ('7297','4121','7011')
+  GROUP BY da.merchant_id, dm.name, dm.mcc, dm.peer_monthly_median
+),
+-- ② Discover: chargeback absence over 6+ months (zero CB = anomaly)
+cb_check AS (
+  SELECT merchant_id,
+    SUM(cb_count)              AS total_cb,
+    COUNT(DISTINCT cb_month)   AS months_observed
+  FROM discover.chargebacks
+  WHERE cb_month >= DATE_TRUNC('month', NOW()) - INTERVAL '6 months'
+  GROUP BY merchant_id
+),
+-- ③ Cap One: commercial entity match via name similarity (requires pg_trgm)
+comm_match AS (
+  SELECT mm.discover_mid, ca.entity_name, ca.credit_limit
+  FROM capone.commercial_accounts ca
+  JOIN combined.merchant_map mm
+    ON SIMILARITY(LOWER(ca.entity_name), LOWER(mm.legal_entity_name)) > 0.80
+),
+-- ④ Score: 1 point per triggered anomaly flag, max 4
+scored AS (
+  SELECT ms.merchant_id, ms.name, ms.volume_multiple, ms.cnp_rate,
+    COALESCE(cb.total_cb, 0)   AS chargebacks_6mo,
+    cb.months_observed,
+    cm.entity_name             AS commercial_entity,
+    cm.credit_limit,
+    (CASE WHEN ms.volume_multiple > 2.5                                          THEN 1 ELSE 0 END
+     + CASE WHEN ms.cnp_rate > 0.70                                              THEN 1 ELSE 0 END
+     + CASE WHEN COALESCE(cb.total_cb,0) = 0 AND COALESCE(cb.months_observed,0) >= 6
+                                                                                 THEN 1 ELSE 0 END
+     + CASE WHEN cm.discover_mid IS NOT NULL                                     THEN 1 ELSE 0 END
+    ) AS anomaly_score
+  FROM merchant_signals ms
+  LEFT JOIN cb_check cb   ON cb.merchant_id  = ms.merchant_id
+  LEFT JOIN comm_match cm ON cm.discover_mid = ms.merchant_id
+)
+SELECT *,
+  CASE WHEN anomaly_score >= 3 THEN 'FLAGGED'
+       WHEN anomaly_score  = 2 THEN 'REVIEW'
+       ELSE 'PASS'
+  END AS ht5_status
+FROM scored
+ORDER BY anomaly_score DESC, monthly_volume DESC;`,
+      altCode: `import pandas as pd
+from sqlalchemy import create_engine
+engine = create_engine("postgresql+psycopg2://user:pass@host/db")
+
+# ① Discover: merchant signals — volume vs peer, CNP rate
+auths = pd.read_sql(
+    "SELECT da.merchant_id, dm.name, dm.mcc, da.amount, da.is_cnp, "
+    "dm.peer_monthly_median FROM discover.authorizations da "
+    "JOIN discover.merchants dm USING (merchant_id) "
+    "WHERE da.auth_ts >= NOW()-INTERVAL '30 days' "
+    "AND dm.mcc IN ('7297','4121','7011')", engine)
+signals = (auths.groupby(['merchant_id','name','mcc','peer_monthly_median'])
+    .agg(monthly_volume=('amount','sum'), cnp_rate=('is_cnp','mean'))
+    .reset_index())
+signals['volume_multiple'] = signals.monthly_volume / signals.peer_monthly_median.clip(lower=1)
+
+# ② Discover: chargeback absence — zero chargebacks over 6+ months = anomaly
+cb = pd.read_sql(
+    "SELECT merchant_id, SUM(cb_count) AS total_cb, "
+    "COUNT(DISTINCT cb_month) AS months_obs "
+    "FROM discover.chargebacks WHERE cb_month >= NOW()-INTERVAL '6 months' "
+    "GROUP BY merchant_id", engine)
+
+# ③ Cap One: commercial entity fuzzy match (pre-computed via pg_trgm in DB)
+comm = pd.read_sql(
+    "SELECT mm.discover_mid AS merchant_id, ca.entity_name, ca.credit_limit "
+    "FROM capone.commercial_accounts ca "
+    "JOIN combined.merchant_map mm "
+    "ON SIMILARITY(LOWER(ca.entity_name), LOWER(mm.legal_entity_name)) > 0.80", engine)
+
+# ④ Score and classify
+result = (signals.merge(cb, on='merchant_id', how='left')
+    .fillna({'total_cb': 0, 'months_obs': 0})
+    .merge(comm, on='merchant_id', how='left'))
+result['flag_volume'] = (result.volume_multiple > 2.5).astype(int)
+result['flag_cnp']    = (result.cnp_rate > 0.70).astype(int)
+result['flag_cb']     = ((result.total_cb == 0) & (result.months_obs >= 6)).astype(int)
+result['flag_comm']   = result.entity_name.notna().astype(int)
+result['anomaly_score'] = result[['flag_volume','flag_cnp','flag_cb','flag_comm']].sum(axis=1)
+result['ht5_status']  = result.anomaly_score.map(
+    lambda s: 'FLAGGED' if s >= 3 else 'REVIEW' if s == 2 else 'PASS')
+print(result[['merchant_id','name','volume_multiple','cnp_rate','anomaly_score','ht5_status']]
+      .sort_values('anomaly_score', ascending=False))`,
+      classification: {
+        flagged: 'anomaly_score ≥ 3 of 4 flags (volume outlier + CNP + zero-CB + commercial match)',
+        review:  'anomaly_score = 2 of 4 flags — two concurrent anomalies require investigation',
+        pass:    'anomaly_score ≤ 1 — isolated anomaly consistent with legitimate variation',
+      },
+    },
   },
 
   {
@@ -370,7 +918,7 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
     advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008',
     advisoryTitle: 'Supplemental Advisory on Identifying and Reporting Human Trafficking and Related Activity',
     advisoryGuidance:
-      'Typology 3 describes multi-account controllers and money mule networks — a single individual managing multiple accounts across institutions, or funds rapidly transferred to third parties with no apparent relationship. Shared device fingerprints across accounts from different named customers, and multiple cards from different issuing banks converging at the same merchant within narrow time windows, are specific red flags for a controller operating a mule network.',
+      'FIN-2020-A008 Typology 3 (Funnel Accounts) describes accounts receiving multiple cash deposits below the CTR threshold from various sources and locations, followed by rapid consolidation and disbursement to different geographic areas — consistent with layering trafficking proceeds across financial institutions and cardholders.',
     detectionObjective:
       'Identify single controllers operating multiple card accounts across institutions via shared device or IP signals, and detect multi-issuer card convergence at specific merchants consistent with coordinated mule network cashout.',
     computationalSteps: [
@@ -414,5 +962,137 @@ export const PLAYBOOK_RULES: PlaybookRule[] = [
         ],
       },
     ],
+    script: {
+      language: 'python',
+      altLanguage: 'sql',
+      tables: [
+        { name: 'capone.device_sessions', source: 'capone' },
+        { name: 'discover.authorizations', source: 'discover' },
+        { name: 'discover.terminals', source: 'discover' },
+        { name: 'combined.merchant_map', source: 'combined' },
+      ],
+      code: `import pandas as pd
+from sklearn.cluster import DBSCAN
+from sklearn.metrics.pairwise import cosine_similarity
+from sqlalchemy import create_engine
+
+engine = create_engine("postgresql+psycopg2://user:pass@host/db")
+
+# ① Cap One: load device sessions, cluster by fingerprint similarity (DBSCAN)
+sessions = pd.read_sql("""
+    SELECT account_id, device_fp, ip_address
+    FROM capone.device_sessions
+    WHERE session_ts >= NOW() - INTERVAL '30 days'
+""", engine)
+
+fp_encoded  = pd.get_dummies(sessions["device_fp"]).values
+dist_matrix = 1 - cosine_similarity(fp_encoded)   # convert to distance
+sessions["cluster"] = DBSCAN(
+    eps=0.05, min_samples=3, metric="precomputed"  # 95% similarity threshold
+).fit_predict(dist_matrix)
+
+# Keep clusters where 3+ distinct accounts share a device fingerprint
+clusters = (
+    sessions[sessions.cluster >= 0]
+    .groupby("cluster")
+    .agg(accounts=("account_id", "unique"), ips=("ip_address", "unique"))
+    .assign(account_count=lambda d: d.accounts.map(len))
+    .query("account_count >= 3")
+)
+
+# ② Discover: multi-BIN convergence per merchant in 90-minute windows
+convergence = pd.read_sql("""
+    SELECT mm.capone_mid,
+           COUNT(DISTINCT LEFT(da.bin, 6)) AS distinct_bins
+    FROM discover.authorizations da
+    JOIN combined.merchant_map mm ON mm.discover_mid = da.merchant_id
+    WHERE da.auth_ts >= NOW() - INTERVAL '30 days'
+    GROUP BY mm.capone_mid,
+             (EXTRACT(EPOCH FROM da.auth_ts) / 5400)::INT
+    HAVING COUNT(DISTINCT LEFT(da.bin, 6)) >= 6
+""", engine)
+conv_events = convergence.groupby("capone_mid").size().rename("convergence_events")
+
+# ③ Cross-institution IP match: Cap One session IP == Discover terminal IP
+terminal_ips = set(pd.read_sql(
+    "SELECT DISTINCT ip_address FROM discover.terminals", engine
+)["ip_address"])
+
+# ④ Score and classify each device cluster
+def classify(row):
+    ip_hit = bool(set(row.ips) & terminal_ips)
+    conv   = int(conv_events.get(row.name, 0))
+    if ip_hit and conv >= 2: return "FLAGGED"   # controller confirmed
+    if ip_hit or  conv >= 2: return "REVIEW"    # partial signal
+    return "PASS"
+
+clusters["ht6_status"] = clusters.apply(classify, axis=1)
+print(clusters[["accounts", "account_count", "ht6_status"]])`,
+      altCode: `-- ① Cap One: accounts sharing the same device fingerprint (≥ 3 accounts per FP)
+WITH shared_devices AS (
+  SELECT device_fp,
+    array_agg(DISTINCT account_id) AS accounts,
+    COUNT(DISTINCT account_id)     AS account_count
+  FROM capone.device_sessions
+  WHERE session_ts >= NOW() - INTERVAL '30 days'
+  GROUP BY device_fp
+  HAVING COUNT(DISTINCT account_id) >= 3
+),
+-- ② Cap One: collect all session IPs from flagged device clusters
+cluster_ips AS (
+  SELECT ds.ip_address, sd.device_fp
+  FROM capone.device_sessions ds
+  JOIN shared_devices sd USING (device_fp)
+  WHERE ds.session_ts >= NOW() - INTERVAL '30 days'
+),
+-- ③ Discover: IP cross-match — session IP appears in merchant terminal registry
+ip_cross AS (
+  SELECT ci.device_fp, t.merchant_id AS terminal_merchant
+  FROM cluster_ips ci
+  JOIN discover.terminals t USING (ip_address)
+),
+-- ④ Discover: multi-BIN convergence — 6+ distinct issuers per 90-min window
+bin_convergence AS (
+  SELECT mm.capone_mid, COUNT(*) AS convergence_events
+  FROM (
+    SELECT da.merchant_id,
+      (EXTRACT(EPOCH FROM da.auth_ts) / 5400)::INT AS window_bucket
+    FROM discover.authorizations da
+    WHERE da.auth_ts >= NOW() - INTERVAL '30 days'
+    GROUP BY da.merchant_id, window_bucket
+    HAVING COUNT(DISTINCT LEFT(da.bin, 6)) >= 6
+  ) conv
+  JOIN combined.merchant_map mm ON mm.discover_mid = conv.merchant_id
+  GROUP BY mm.capone_mid
+)
+-- ⑤ Join and classify each device cluster
+SELECT sd.device_fp, sd.account_count,
+  COUNT(DISTINCT ic.terminal_merchant) > 0   AS ip_cross_match,
+  COALESCE(MAX(bc.convergence_events), 0)    AS convergence_events,
+  CASE
+    WHEN COUNT(DISTINCT ic.terminal_merchant) > 0
+     AND COALESCE(MAX(bc.convergence_events), 0) >= 2 THEN 'FLAGGED'
+    WHEN COUNT(DISTINCT ic.terminal_merchant) > 0
+      OR COALESCE(MAX(bc.convergence_events), 0) >= 2 THEN 'REVIEW'
+    ELSE 'PASS'
+  END AS ht6_status
+FROM shared_devices sd
+LEFT JOIN cluster_ips ci USING (device_fp)
+LEFT JOIN ip_cross ic     USING (device_fp)
+LEFT JOIN bin_convergence bc
+  ON bc.capone_mid IN (
+    SELECT mm.capone_mid FROM cluster_ips ci2
+    JOIN discover.terminals t2 ON t2.ip_address = ci2.ip_address
+    JOIN combined.merchant_map mm ON mm.discover_mid = t2.merchant_id
+    WHERE ci2.device_fp = sd.device_fp
+  )
+GROUP BY sd.device_fp, sd.account_count
+ORDER BY convergence_events DESC, ip_cross_match DESC;`,
+      classification: {
+        flagged: 'device cluster confirmed AND IP cross-match AND convergence_events ≥ 2',
+        review:  'device cluster OR convergence_events ≥ 2 — partial cross-institution signal',
+        pass:    'no shared device cluster and convergence_events < 2',
+      },
+    },
   },
 ]

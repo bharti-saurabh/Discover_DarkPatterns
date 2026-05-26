@@ -3,15 +3,13 @@ import { DARK_PATTERN_STATS } from '../../data/darkPatternsData'
 import CorridorView from './CorridorView'
 import ControllerGraph from './ControllerGraph'
 import FrontBusinessView from './FrontBusinessView'
-import PlaybookView from './PlaybookView'
 
-type DarkTab = 'corridor' | 'controller' | 'front-business' | 'playbook'
+type DarkTab = 'corridor' | 'controller' | 'front-business'
 
 const TABS: { id: DarkTab; label: string; count: number | string }[] = [
   { id: 'corridor',       label: 'Geographic Corridors', count: 2 },
   { id: 'controller',     label: 'Controller Networks',  count: 1 },
   { id: 'front-business', label: 'Front Businesses',     count: 2 },
-  { id: 'playbook',       label: 'FinCEN Rulebook',       count: 6 },
 ]
 
 function StatBar() {
@@ -101,13 +99,6 @@ export default function DarkPatterns() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-slate-400 ml-auto">
-          <span>FinCEN refs:</span>
-          <a href="https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008" target="_blank" rel="noopener noreferrer"
-            className="font-semibold text-amber-600 hover:text-amber-500">FIN-2014-A008 ↗</a>
-          <a href="https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008" target="_blank" rel="noopener noreferrer"
-            className="font-semibold text-amber-600 hover:text-amber-500">FIN-2020-A008 ↗</a>
-        </div>
       </div>
 
       {/* Tab content */}
@@ -115,7 +106,6 @@ export default function DarkPatterns() {
         {activeTab === 'corridor'       && <CorridorView />}
         {activeTab === 'controller'     && <ControllerGraph />}
         {activeTab === 'front-business' && <FrontBusinessView />}
-        {activeTab === 'playbook'       && <PlaybookView />}
       </div>
     </div>
   )
