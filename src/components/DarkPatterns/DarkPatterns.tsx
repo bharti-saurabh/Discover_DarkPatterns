@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
 import {
   CORRIDOR_CASES, CONTROLLER_CASES, FRONT_BUSINESS_CASES,
   FINCEN_CATEGORIES,
@@ -186,6 +187,51 @@ function AgentMonitor({
   )
 }
 
+// ── Hour chart (merchant cases) ────────────────────────────────────────────────
+
+function fmt$(n: number) {
+  if (n >= 1000) return `$${(n / 1000).toFixed(0)}K`
+  return `$${n}`
+}
+
+function HourChart({ data, nightPct }: { data: { hour: number; volume: number; peerAvg: number }[]; nightPct: number }) {
+  const nightHours = new Set([22, 23, 0, 1, 2, 3])
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] font-bold text-slate-700">Transaction Volume by Hour</span>
+        <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+          {(nightPct * 100).toFixed(0)}% after 10 PM
+        </span>
+      </div>
+      <ResponsiveContainer width="100%" height={150}>
+        <BarChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barCategoryGap={1}>
+          <XAxis dataKey="hour" tick={{ fontSize: 9, fill: '#94A3B8' }} tickFormatter={h => h % 6 === 0 ? `${h}:00` : ''} />
+          <YAxis tick={{ fontSize: 9, fill: '#94A3B8' }} />
+          <Tooltip
+            formatter={(val, name) => [fmt$(val as number), name === 'volume' ? 'This merchant' : 'Peer avg']}
+            labelFormatter={h => `${h}:00`}
+            contentStyle={{ fontSize: 11, border: '1px solid #E2E8F0', borderRadius: 8 }}
+          />
+          <ReferenceLine x={22} stroke="#E11D48" strokeDasharray="3 3" strokeWidth={1.5}
+            label={{ value: '10 PM', fontSize: 9, fill: '#E11D48', position: 'insideTop' }} />
+          <Bar dataKey="peerAvg" name="peerAvg" fill="#E2E8F0" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="volume" name="volume" radius={[2, 2, 0, 0]}>
+            {data.map(entry => (
+              <Cell key={entry.hour} fill={nightHours.has(entry.hour) ? '#E11D48' : '#6366F1'} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="flex gap-4 mt-2">
+        <span className="flex items-center gap-1 text-[9px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-indigo-500 inline-block" /> This merchant</span>
+        <span className="flex items-center gap-1 text-[9px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> After 10 PM (flagged)</span>
+        <span className="flex items-center gap-1 text-[9px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-slate-200 inline-block" /> Peer average</span>
+      </div>
+    </div>
+  )
+}
+
 // ── Case Detail (center panel) ─────────────────────────────────────────────────
 
 function CaseDetail({ caseId }: { caseId: string }) {
@@ -267,6 +313,13 @@ function CaseDetail({ caseId }: { caseId: string }) {
           </div>
         </div>
       )}
+
+      {/* Hourly spend chart — merchant cases only */}
+      {entry.entityType === 'merchant' && (() => {
+        const fb = FRONT_BUSINESS_CASES.find(c => c.id === caseId)
+        if (!fb) return null
+        return <HourChart data={fb.hourlyVolume} nightPct={fb.nightPct} />
+      })()}
 
       {/* Combined insight */}
       <div className="grid grid-cols-3 gap-3">
