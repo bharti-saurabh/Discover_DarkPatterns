@@ -79,14 +79,10 @@ function AgentMonitor({
   selectedCaseId: string | null
   onSelectCase: (id: string) => void
 }) {
-  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set(['mcc', 'strategist']))
+  const [expandedAgent, setExpandedAgent] = useState<string | null>('mcc')
 
   function toggleAgent(id: string) {
-    setExpandedAgents(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+    setExpandedAgent(prev => prev === id ? null : id)
   }
 
   const entityTypeLabel: Record<EntityType, string> = {
@@ -110,7 +106,7 @@ function AgentMonitor({
       <div className="flex-1 overflow-y-auto">
         {AGENTS.map(agent => {
           const hitCases = hitCasesForAgent(agent.id)
-          const isExpanded = expandedAgents.has(agent.id)
+          const isExpanded = expandedAgent === agent.id
           const hasHits = hitCases.length > 0
 
           return (
