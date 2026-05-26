@@ -32,9 +32,28 @@ function FlowArrow({ label }: { label: string }) {
 }
 
 function AlgorithmDiagram({ rule }: { rule: PlaybookRule }) {
-  const capone   = rule.script.tables.filter(t => t.source === 'capone')
-  const discover = rule.script.tables.filter(t => t.source === 'discover')
-  const combined = rule.script.tables.filter(t => t.source === 'combined')
+  const fieldsByType: Record<DataField['type'], DataField[]> = {
+    transaction: rule.dataFields.filter(f => f.type === 'transaction'),
+    merchant:    rule.dataFields.filter(f => f.type === 'merchant'),
+    device:      rule.dataFields.filter(f => f.type === 'device'),
+    geographic:  rule.dataFields.filter(f => f.type === 'geographic'),
+    temporal:    rule.dataFields.filter(f => f.type === 'temporal'),
+  }
+  const typeLabels: Record<DataField['type'], string> = {
+    transaction: 'Auth Transactions',
+    merchant:    'Merchant Data',
+    device:      'Device & Session',
+    geographic:  'Geographic',
+    temporal:    'Temporal',
+  }
+  const typeColors: Record<DataField['type'], string> = {
+    transaction: 'bg-indigo-50 border-indigo-100 text-indigo-700',
+    merchant:    'bg-violet-50 border-violet-100 text-violet-700',
+    device:      'bg-cyan-50 border-cyan-100 text-cyan-700',
+    geographic:  'bg-emerald-50 border-emerald-100 text-emerald-700',
+    temporal:    'bg-amber-50 border-amber-100 text-amber-700',
+  }
+  const activeTypes = (Object.keys(fieldsByType) as DataField['type'][]).filter(t => fieldsByType[t].length > 0)
 
   return (
     <div className="space-y-3">
@@ -43,50 +62,28 @@ function AlgorithmDiagram({ rule }: { rule: PlaybookRule }) {
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Input Datasets</div>
 
-        {/* Table chips grouped by source */}
-        <div className="space-y-1.5 mb-3">
-          {capone.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-wider w-14 shrink-0">Cap One</span>
-              {capone.map(t => (
-                <span key={t.name} className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border bg-indigo-50 text-indigo-700 border-indigo-200">{t.name}</span>
-              ))}
-            </div>
-          )}
-          {discover.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[8px] font-bold text-violet-400 uppercase tracking-wider w-14 shrink-0">Discover</span>
-              {discover.map(t => (
-                <span key={t.name} className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border bg-violet-50 text-violet-700 border-violet-200">{t.name}</span>
-              ))}
-            </div>
-          )}
-          {combined.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider w-14 shrink-0">Bridge</span>
-              {combined.map(t => (
-                <span key={t.name} className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border bg-slate-100 text-slate-500 border-slate-200">{t.name}</span>
-              ))}
-            </div>
-          )}
+        {/* All tables as chips — no source grouping */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {rule.script.tables.map(t => (
+            <span key={t.name} className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border bg-white text-slate-600 border-slate-300">{t.name}</span>
+          ))}
         </div>
 
-        {/* Data fields — flat list, 2-column grid */}
-        <div className="border-t border-slate-200 pt-2.5">
-          <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-2">Key Fields</div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            {rule.dataFields.map((f, i) => (
-              <div key={i} className="flex items-start gap-1.5">
-                <span className="shrink-0 w-4 h-4 rounded bg-slate-200 text-slate-500 text-[7px] font-bold flex items-center justify-center mt-0.5">
-                  {FIELD_TYPE_ICONS[f.type]}
-                </span>
-                <div className="min-w-0">
-                  <div className="text-[9px] font-semibold text-slate-700 leading-tight">{f.name}</div>
-                  <div className="text-[8px] text-slate-400 leading-tight">{f.description}</div>
-                </div>
+        {/* Fields grouped by data type, inline with tables */}
+        <div className="grid grid-cols-2 gap-2">
+          {activeTypes.map(type => (
+            <div key={type} className={`border rounded-lg p-2 ${typeColors[type]}`}>
+              <div className="text-[8px] font-bold uppercase tracking-wider opacity-70 mb-1.5">{typeLabels[type]}</div>
+              <div className="space-y-1">
+                {fieldsByType[type].map((f, i) => (
+                  <div key={i}>
+                    <div className="text-[9px] font-semibold leading-tight">{f.name}</div>
+                    <div className="text-[8px] opacity-60 leading-tight">{f.description}</div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
 
