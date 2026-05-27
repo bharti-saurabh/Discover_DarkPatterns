@@ -177,17 +177,71 @@ export const CORRIDOR_CASES: CorridorCase[] = [
       { agent: 'Alert Engine', finding: 'HIGH RISK — probable human trafficking corridor. Coordinated multi-card, multi-issuer movement pattern. Cap One cardholder CAP-004821 / Discover DIS-002193 identified as likely victim. Escalate for SAR filing review.', source: 'combined', confidence: 94, timestamp: '2024-11-14 22:17:35', isAlert: true },
     ],
     stops: [
-      { day: 1,  city: 'Boston',       state: 'MA', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 89,  time: '11:42 PM', source: 'capone', merchantId: 'MID-0000041' }, { mcc: '6010', mccLabel: 'ATM Cash',      amount: 300, time: '11:58 PM', source: 'capone' }] },
-      { day: 2,  city: 'Boston',       state: 'MA', transactions: [{ mcc: '4121', mccLabel: 'Rideshare',       amount: 34,  time: '09:15 PM', source: 'capone' }] },
-      { day: 3,  city: 'Providence',   state: 'RI', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 79,  time: '10:33 PM', source: 'discover', merchantId: 'MID-0000187' }, { mcc: '6010', mccLabel: 'ATM Cash',      amount: 400, time: '10:51 PM', source: 'capone' }] },
-      { day: 5,  city: 'New York',     state: 'NY', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 129, time: '11:07 PM', source: 'discover', merchantId: 'MID-0000312' }, { mcc: '6540', mccLabel: 'Prepaid Reload', amount: 500, time: '11:23 PM', source: 'capone' }, { mcc: '6010', mccLabel: 'ATM Cash',      amount: 500, time: '11:44 PM', source: 'capone' }] },
-      { day: 7,  city: 'New York',     state: 'NY', transactions: [{ mcc: '4121', mccLabel: 'Rideshare',       amount: 28,  time: '08:45 PM', source: 'capone' }] },
-      { day: 8,  city: 'Philadelphia', state: 'PA', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 89,  time: '10:52 PM', source: 'discover', merchantId: 'MID-0000491' }, { mcc: '6010', mccLabel: 'ATM Cash',      amount: 300, time: '11:09 PM', source: 'capone' }] },
-      { day: 10, city: 'Baltimore',    state: 'MD', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 79,  time: '11:31 PM', source: 'discover', merchantId: 'MID-0000623' }, { mcc: '6540', mccLabel: 'Prepaid Reload', amount: 500, time: '11:47 PM', source: 'capone' }] },
-      { day: 12, city: 'Washington',   state: 'DC', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 99,  time: '10:18 PM', source: 'discover', merchantId: 'MID-0000744' }, { mcc: '6010', mccLabel: 'ATM Cash',      amount: 400, time: '10:29 PM', source: 'capone' }, { mcc: '4121', mccLabel: 'Rideshare',       amount: 19,  time: '03:41 AM', source: 'capone' }] },
-      { day: 14, city: 'Baltimore',    state: 'MD', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 79,  time: '11:02 PM', source: 'discover', merchantId: 'MID-0000623' }] },
-      { day: 16, city: 'Philadelphia', state: 'PA', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 89,  time: '10:44 PM', source: 'discover', merchantId: 'MID-0000491' }, { mcc: '6010', mccLabel: 'ATM Cash',      amount: 300, time: '11:01 PM', source: 'capone' }] },
-      { day: 18, city: 'Boston',       state: 'MA', transactions: [{ mcc: '4121', mccLabel: 'Rideshare',       amount: 41,  time: '06:23 AM', source: 'capone' }] },
+      // Day 1 — Boston check-in + ATM (11:42 PM)
+      { day: 1,  city: 'Boston',       state: 'MA', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 89,  time: '11:42 PM', source: 'capone',   merchantId: 'MID-0000041' },
+        { mcc: '6010', mccLabel: 'ATM Cash',          amount: 300, time: '11:58 PM', source: 'capone' },
+      ]},
+      // Day 2 — Boston: rideshare out, pharmacy (only non-HT daytime purchase)
+      { day: 2,  city: 'Boston',       state: 'MA', transactions: [
+        { mcc: '4121', mccLabel: 'Rideshare',         amount: 34,  time: '09:15 PM', source: 'capone' },
+        { mcc: '5912', mccLabel: 'Pharmacy',          amount: 14,  time: '02:18 PM', source: 'capone' },
+      ]},
+      // Day 3 — Providence check-in + ATM
+      { day: 3,  city: 'Providence',   state: 'RI', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 79,  time: '10:33 PM', source: 'discover', merchantId: 'MID-0000187' },
+        { mcc: '6010', mccLabel: 'ATM Cash',          amount: 400, time: '10:51 PM', source: 'capone' },
+      ]},
+      // Day 4 — Providence: rideshare transit to New York
+      { day: 4,  city: 'Providence',   state: 'RI', transactions: [
+        { mcc: '4121', mccLabel: 'Rideshare',         amount: 27,  time: '08:45 PM', source: 'capone' },
+      ]},
+      // Day 5 — New York: hotel + prepaid reload + ATM (all within 40 min, 11 PM)
+      { day: 5,  city: 'New York',     state: 'NY', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 129, time: '11:07 PM', source: 'discover', merchantId: 'MID-0000312' },
+        { mcc: '6540', mccLabel: 'Prepaid Reload',    amount: 500, time: '11:23 PM', source: 'capone' },
+        { mcc: '6010', mccLabel: 'ATM Cash',          amount: 500, time: '11:44 PM', source: 'capone' },
+      ]},
+      // Day 7 — New York: rideshare + convenience store (only daytime spend entire trip)
+      { day: 7,  city: 'New York',     state: 'NY', transactions: [
+        { mcc: '4121', mccLabel: 'Rideshare',         amount: 28,  time: '09:15 PM', source: 'capone' },
+        { mcc: '5999', mccLabel: 'Convenience Store', amount: 9,   time: '04:22 PM', source: 'capone' },
+      ]},
+      // Day 8 — Philadelphia check-in + ATM
+      { day: 8,  city: 'Philadelphia', state: 'PA', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 89,  time: '10:52 PM', source: 'discover', merchantId: 'MID-0000491' },
+        { mcc: '6010', mccLabel: 'ATM Cash',          amount: 300, time: '11:09 PM', source: 'capone' },
+      ]},
+      // Day 10 — Baltimore: hotel + prepaid reload
+      { day: 10, city: 'Baltimore',    state: 'MD', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 79,  time: '11:31 PM', source: 'discover', merchantId: 'MID-0000623' },
+        { mcc: '6540', mccLabel: 'Prepaid Reload',    amount: 500, time: '11:47 PM', source: 'capone' },
+      ]},
+      // Day 11 — Baltimore: rideshare transit to DC
+      { day: 11, city: 'Baltimore',    state: 'MD', transactions: [
+        { mcc: '4121', mccLabel: 'Rideshare',         amount: 19,  time: '07:22 PM', source: 'capone' },
+      ]},
+      // Day 12 — Washington DC: hotel + ATM + early-AM rideshare (3:41 AM)
+      { day: 12, city: 'Washington',   state: 'DC', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 99,  time: '10:18 PM', source: 'discover', merchantId: 'MID-0000744' },
+        { mcc: '6010', mccLabel: 'ATM Cash',          amount: 400, time: '10:29 PM', source: 'capone' },
+        { mcc: '4121', mccLabel: 'Rideshare',         amount: 19,  time: '03:41 AM', source: 'capone' },
+      ]},
+      // Day 14 — Baltimore return: hotel + pharmacy (morning visit)
+      { day: 14, city: 'Baltimore',    state: 'MD', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 79,  time: '11:02 PM', source: 'discover', merchantId: 'MID-0000623' },
+        { mcc: '5912', mccLabel: 'Pharmacy',          amount: 21,  time: '09:34 AM', source: 'capone' },
+      ]},
+      // Day 16 — Philadelphia return: hotel + ATM + grocery (only grocery purchase entire 18 days)
+      { day: 16, city: 'Philadelphia', state: 'PA', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 89,  time: '10:44 PM', source: 'discover', merchantId: 'MID-0000491' },
+        { mcc: '6010', mccLabel: 'ATM Cash',          amount: 300, time: '11:01 PM', source: 'capone' },
+        { mcc: '5411', mccLabel: 'Grocery',           amount: 32,  time: '03:15 PM', source: 'capone' },
+      ]},
+      // Day 18 — Boston: early-AM rideshare return (6:23 AM)
+      { day: 18, city: 'Boston',       state: 'MA', transactions: [
+        { mcc: '4121', mccLabel: 'Rideshare',         amount: 41,  time: '06:23 AM', source: 'capone' },
+      ]},
     ],
     sarStatus: { status: 'sar-review', filingType: 'SAR-HT', deadline: '2024-12-07', team: 'BSA/AML Northeast', notes: 'Probable victim pattern. 30-day SAR clock started 2024-11-14. Coordinating with LE liaison for victim services referral.' },
     crossCaseRefs: [{ caseId: 'FRONT-002', tab: 'front-business', relationship: '3 corridor cardholders are recurring customers of this transport merchant — terminal IP overlaps with corridor hotel stops.' }],
@@ -222,12 +276,49 @@ export const CORRIDOR_CASES: CorridorCase[] = [
       { agent: 'Alert Engine', finding: 'HIGH RISK — I-10 Southern corridor trafficking pattern. New account fast-tracked into movement. Merchant MID-0001102 (Beaumont, TX) flagged as probable trafficking venue — third coordinated event. Recommend venue-level investigation.', source: 'combined', confidence: 87, timestamp: '2024-11-10 23:04:48', isAlert: true },
     ],
     stops: [
-      { day: 1,  city: 'Houston',      state: 'TX', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 69,  time: '10:55 PM', source: 'capone' }, { mcc: '6010', mccLabel: 'ATM Cash',      amount: 400, time: '11:12 PM', source: 'capone' }] },
-      { day: 3,  city: 'Beaumont',     state: 'TX', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 59,  time: '11:38 PM', source: 'discover', merchantId: 'MID-0001102' }, { mcc: '6540', mccLabel: 'Prepaid Reload', amount: 500, time: '11:54 PM', source: 'capone' }] },
-      { day: 5,  city: 'New Orleans',  state: 'LA', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 99,  time: '10:21 PM', source: 'discover', merchantId: 'MID-0001287' }, { mcc: '6010', mccLabel: 'ATM Cash',      amount: 500, time: '10:44 PM', source: 'capone' }] },
-      { day: 7,  city: 'Mobile',       state: 'AL', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 69,  time: '11:15 PM', source: 'discover', merchantId: 'MID-0001394' }, { mcc: '6010', mccLabel: 'ATM Cash',      amount: 300, time: '11:33 PM', source: 'capone' }] },
-      { day: 9,  city: 'Jacksonville', state: 'FL', transactions: [{ mcc: '7011', mccLabel: 'Hotel',          amount: 79,  time: '10:49 PM', source: 'discover', merchantId: 'MID-0001521' }, { mcc: '6540', mccLabel: 'Prepaid Reload', amount: 500, time: '11:07 PM', source: 'capone' }] },
-      { day: 10, city: 'Houston',      state: 'TX', transactions: [{ mcc: '4121', mccLabel: 'Rideshare',       amount: 22,  time: '04:18 AM', source: 'capone' }] },
+      // Day 1 — Houston: first hotel + ATM (account is 34 days old, no prior pattern)
+      { day: 1,  city: 'Houston',      state: 'TX', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 69,  time: '10:55 PM', source: 'capone' },
+        { mcc: '6010', mccLabel: 'ATM Cash',          amount: 400, time: '11:12 PM', source: 'capone' },
+      ]},
+      // Day 2 — Houston: convenience store (only non-HT purchase while in city)
+      { day: 2,  city: 'Houston',      state: 'TX', transactions: [
+        { mcc: '5999', mccLabel: 'Convenience Store', amount: 9,   time: '04:30 PM', source: 'capone' },
+      ]},
+      // Day 3 — Beaumont: hotel + prepaid reload (nexus property MID-0001102)
+      { day: 3,  city: 'Beaumont',     state: 'TX', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 59,  time: '11:38 PM', source: 'discover', merchantId: 'MID-0001102' },
+        { mcc: '6540', mccLabel: 'Prepaid Reload',    amount: 500, time: '11:54 PM', source: 'capone' },
+      ]},
+      // Day 4 — Beaumont: rideshare transit to New Orleans
+      { day: 4,  city: 'Beaumont',     state: 'TX', transactions: [
+        { mcc: '4121', mccLabel: 'Rideshare',         amount: 31,  time: '08:45 PM', source: 'capone' },
+      ]},
+      // Day 5 — New Orleans: hotel + ATM + grocery (only food purchase entire corridor)
+      { day: 5,  city: 'New Orleans',  state: 'LA', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 99,  time: '10:21 PM', source: 'discover', merchantId: 'MID-0001287' },
+        { mcc: '6010', mccLabel: 'ATM Cash',          amount: 500, time: '10:44 PM', source: 'capone' },
+        { mcc: '5411', mccLabel: 'Grocery',           amount: 12,  time: '04:45 PM', source: 'capone' },
+      ]},
+      // Day 6 — New Orleans: rideshare transit to Mobile
+      { day: 6,  city: 'New Orleans',  state: 'LA', transactions: [
+        { mcc: '4121', mccLabel: 'Rideshare',         amount: 24,  time: '08:15 PM', source: 'capone' },
+      ]},
+      // Day 7 — Mobile: hotel + ATM + pharmacy (morning stop before next leg)
+      { day: 7,  city: 'Mobile',       state: 'AL', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 69,  time: '11:15 PM', source: 'discover', merchantId: 'MID-0001394' },
+        { mcc: '6010', mccLabel: 'ATM Cash',          amount: 300, time: '11:33 PM', source: 'capone' },
+        { mcc: '5912', mccLabel: 'Pharmacy',          amount: 16,  time: '10:22 AM', source: 'capone' },
+      ]},
+      // Day 9 — Jacksonville: hotel + prepaid reload
+      { day: 9,  city: 'Jacksonville', state: 'FL', transactions: [
+        { mcc: '7011', mccLabel: 'Hotel',            amount: 79,  time: '10:49 PM', source: 'discover', merchantId: 'MID-0001521' },
+        { mcc: '6540', mccLabel: 'Prepaid Reload',    amount: 500, time: '11:07 PM', source: 'capone' },
+      ]},
+      // Day 10 — Houston: early-AM rideshare (4:18 AM return)
+      { day: 10, city: 'Houston',      state: 'TX', transactions: [
+        { mcc: '4121', mccLabel: 'Rideshare',         amount: 22,  time: '04:18 AM', source: 'capone' },
+      ]},
     ],
     sarStatus: { status: 'monitoring', filingType: 'SAR-HT', deadline: '2024-12-12', team: 'BSA/AML South', notes: 'Merchant MID-0001102 (Beaumont, TX) flagged as repeat venue — third event in 45 days. Venue-level investigation requested from BSA South team.' },
     crossCaseRefs: [],

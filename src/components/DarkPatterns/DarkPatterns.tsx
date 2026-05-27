@@ -56,11 +56,13 @@ const MCC_DOT: Record<string, string> = {
   '7011': 'bg-rose-500', '4121': 'bg-amber-500',
   '6540': 'bg-purple-500', '6010': 'bg-red-600',
   '7297': 'bg-pink-500', '7299': 'bg-pink-500',
+  '5912': 'bg-emerald-500', '5411': 'bg-green-500', '5999': 'bg-teal-500',
 }
 const MCC_PILL: Record<string, string> = {
   '7011': 'bg-rose-100 text-rose-700', '4121': 'bg-amber-100 text-amber-700',
   '6540': 'bg-purple-100 text-purple-700', '6010': 'bg-red-100 text-red-700',
   '7297': 'bg-pink-100 text-pink-700', '7299': 'bg-pink-100 text-pink-700',
+  '5912': 'bg-emerald-100 text-emerald-700', '5411': 'bg-green-100 text-green-700', '5999': 'bg-teal-100 text-teal-700',
 }
 
 // ── Micro-components ─────────────────────────────────────────────────────────────
@@ -164,11 +166,13 @@ function CityTimeline({ c }: { c: CorridorCase }) {
           </div>
         ))}
         <div className="flex gap-3 mt-2 pt-2.5 border-t border-slate-100 flex-wrap">
-          {[['7011', 'Hotel/Motel'], ['4121', 'Rideshare'], ['6540', 'Prepaid Reload'], ['6010', 'ATM Cash']].map(([mcc, label]) => (
-            <span key={mcc} className="flex items-center gap-1.5 text-[9px] text-slate-500">
-              <span className={`w-2.5 h-2.5 rounded-full ${MCC_DOT[mcc]}`} />{label}
-            </span>
-          ))}
+          {([['7011', 'Hotel/Motel'], ['4121', 'Rideshare'], ['6540', 'Prepaid Reload'], ['6010', 'ATM Cash'], ['5912', 'Pharmacy'], ['5411', 'Grocery'], ['5999', 'Convenience']] as [string, string][])
+            .filter(([mcc]) => c.stops.some(s => s.transactions.some(t => t.mcc === mcc)))
+            .map(([mcc, label]) => (
+              <span key={mcc} className="flex items-center gap-1.5 text-[9px] text-slate-500">
+                <span className={`w-2.5 h-2.5 rounded-full ${MCC_DOT[mcc]}`} />{label}
+              </span>
+            ))}
         </div>
       </div>
     </div>
@@ -501,84 +505,6 @@ function AccountContextBanner({ c }: { c: CorridorCase }) {
   )
 }
 
-// ── Corridor Map (SVG) ────────────────────────────────────────────────────────────
-
-const CORRIDOR_COORDS: Record<string, { city: string; abbr: string; x: number; y: number }[]> = {
-  'I95-NE': [
-    { city: 'Boston', abbr: 'BOS', x: 178, y: 15 },
-    { city: 'Providence', abbr: 'PRV', x: 168, y: 35 },
-    { city: 'New York', abbr: 'NYC', x: 108, y: 68 },
-    { city: 'Philadelphia', abbr: 'PHL', x: 78, y: 95 },
-    { city: 'Baltimore', abbr: 'BAL', x: 40, y: 115 },
-    { city: 'Washington', abbr: 'DC', x: 28, y: 132 },
-  ],
-  'I10-S': [
-    { city: 'Houston', abbr: 'HOU', x: 12, y: 85 },
-    { city: 'Beaumont', abbr: 'BEA', x: 38, y: 55 },
-    { city: 'New Orleans', abbr: 'NOL', x: 90, y: 75 },
-    { city: 'Mobile', abbr: 'MOB', x: 122, y: 35 },
-    { city: 'Jacksonville', abbr: 'JAX', x: 192, y: 58 },
-  ],
-}
-
-const MCC_SVG_FILL: Record<string, string> = {
-  '7011': '#F43F5E', '4121': '#F59E0B',
-  '6540': '#A855F7', '6010': '#DC2626',
-  '7297': '#EC4899', '7299': '#EC4899',
-}
-
-function CorridorMap({ c }: { c: CorridorCase }) {
-  const coords = CORRIDOR_COORDS[c.corridor]
-  if (!coords) return null
-
-  const cityDomMcc: Record<string, string> = {}
-  c.stops.forEach(stop => {
-    const counts: Record<string, number> = {}
-    stop.transactions.forEach(t => { counts[t.mcc] = (counts[t.mcc] ?? 0) + 1 })
-    const dom = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0]
-    if (dom) cityDomMcc[stop.city] = dom
-  })
-
-  const pathD = coords.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
-
-  return (
-    <div className="bg-slate-900 rounded-xl overflow-hidden" style={{ height: 168 }}>
-      <svg viewBox="0 0 210 155" className="w-full h-full">
-        <style>{`@keyframes drawRoute{to{stroke-dashoffset:0}}`}</style>
-        <rect width="210" height="155" fill="#0F172A" />
-        {/* faint grid */}
-        {[20,40,60,80,100,120,140].map(y => (
-          <line key={y} x1="0" y1={y} x2="210" y2={y} stroke="#1E293B" strokeWidth="0.5" />
-        ))}
-        {/* static dashed route */}
-        <path d={pathD} fill="none" stroke="#6366F1" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.35" />
-        {/* animated draw-on route */}
-        <path d={pathD} fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round"
-          pathLength="1" strokeDasharray="1" strokeDashoffset="1"
-          style={{ animation: 'drawRoute 2s ease-out 0.4s forwards' }} />
-        {/* city dots + labels */}
-        {coords.map(({ city, abbr, x, y }) => {
-          const mcc = Object.keys(cityDomMcc).length > 0
-            ? cityDomMcc[Object.keys(cityDomMcc).find(k => city.startsWith(k) || k.startsWith(city)) ?? ''] ?? cityDomMcc[city]
-            : undefined
-          const fill = mcc ? (MCC_SVG_FILL[mcc] ?? '#94A3B8') : '#94A3B8'
-          const labelY = y > 100 ? y - 9 : y + 15
-          const labelAnchor = x > 150 ? 'end' : x < 50 ? 'start' : 'middle'
-          return (
-            <g key={city}>
-              <circle cx={x} cy={y} r={5.5} fill="#0F172A" stroke={fill} strokeWidth="1.5" />
-              <circle cx={x} cy={y} r={3} fill={fill} />
-              <text x={x} y={labelY} textAnchor={labelAnchor} fill="#94A3B8" fontSize="7.5" fontFamily="monospace" fontWeight="bold">{abbr}</text>
-            </g>
-          )
-        })}
-        {/* corridor label */}
-        <text x="4" y="149" fill="#475569" fontSize="7" fontFamily="sans-serif" fontWeight="bold">{c.corridorLabel}</text>
-      </svg>
-    </div>
-  )
-}
-
 // ── Cardholder detail ─────────────────────────────────────────────────────────────
 
 function CardholderDetail({ c, findings, strategist }: { c: CorridorCase; findings: AgentFinding[]; strategist?: AgentFinding }) {
@@ -623,14 +549,7 @@ function CardholderDetail({ c, findings, strategist }: { c: CorridorCase; findin
             <span>Origin: {c.homeCityState}</span>
           </div>
         </div>
-        <div className="flex gap-4">
-          <div className="w-[38%] shrink-0">
-            <CorridorMap c={c} />
-          </div>
-          <div className="flex-1 overflow-x-auto min-w-0">
-            <CityTimeline c={c} />
-          </div>
-        </div>
+        <CityTimeline c={c} />
         <MccBreakdown c={c} />
       </div>
 

@@ -106,16 +106,16 @@ export const AGENT_FINDINGS: AgentFinding[] = [
     agentId: 'cash', caseId: 'CORR-001',
     steps: [
       { text: 'Aggregate ATM cash advances (MCC 6010) + prepaid reloads (MCC 6540)', metric: '$3,200 total cash-equivalent', threshold: 'Cash velocity ≥ 55%', triggered: true },
-      { text: 'Compute cash velocity ratio over 30-day window', metric: '64% cash-equivalent spend', threshold: '≥ 55%', triggered: true },
+      { text: 'Compute cash velocity ratio over 30-day window', metric: '77% cash-equivalent spend', threshold: '≥ 55%', triggered: true },
       { text: 'Check for structuring — 3+ cash txns $3K–$9.9K within 7 days', metric: 'Distributed — no single txn > $3K', threshold: 'Pattern check', triggered: false },
     ],
-    finding: 'Cash velocity 64% across 6 corridor stops. $3,200 ATM + prepaid reload distributed at each hotel stop.',
+    finding: 'Cash velocity 77% across 6 cities. $3,200 ATM + prepaid distributed at hotel stops; non-HT spend (pharmacy, grocery, convenience) is just 15% of transactions.',
     confidence: 91, verdict: 'FLAGGED',
   },
   {
     agentId: 'movement', caseId: 'CORR-001',
     steps: [
-      { text: 'Build movement timeline from merchant city/state per transaction', metric: '6 cities in 18 days', threshold: '≥ 4 cities in ≤ 14 days', triggered: true },
+      { text: 'Build movement timeline from merchant city/state per transaction', metric: '6 cities in 18 days', threshold: '≥ 4 cities in ≤ 21 days', triggered: true },
       { text: 'Match city sequence against documented corridor routes', metric: 'Boston→Providence→NYC→Philadelphia→Baltimore→DC = I-95 match', threshold: 'Route segment match', triggered: true },
       { text: 'Check for impossible-travel events (same-day, >200 miles)', metric: 'Sequential stops — no impossible travel', threshold: '0 events', triggered: false },
       { text: 'Venue nexus — same merchant hosting distinct cardholder groups', metric: '5 hotel properties flagged as repeat venues', threshold: '≥ 3 events in 45 days', triggered: true },
@@ -148,21 +148,21 @@ export const AGENT_FINDINGS: AgentFinding[] = [
   {
     agentId: 'mcc', caseId: 'CORR-002',
     steps: [
-      { text: 'Compute trafficking MCC ratio over rolling 30 days', metric: '80% in HT MCCs', threshold: '> 70%', triggered: true },
-      { text: 'Scan for hotel → ATM/prepaid sequences within 4-hr windows', metric: '4 sequences detected', threshold: '≥ 2', triggered: true },
+      { text: 'Compute trafficking MCC ratio over rolling 30 days', metric: '81% in HT MCCs', threshold: '> 70%', triggered: true },
+      { text: 'Scan for hotel → ATM/prepaid sequences within 4-hr windows', metric: '5 sequences detected', threshold: '≥ 2', triggered: true },
       { text: 'Cross-issuer BIN clustering at shared merchants', metric: '6–11 BINs at 2 properties', threshold: '≥ 8 BINs', triggered: false },
     ],
-    finding: 'MCC ratio 80% with 4 hotel→ATM sequences. BIN clustering present but below peak threshold at 2 merchants.',
+    finding: 'MCC ratio 81% with 5 hotel→ATM sequences. Non-HT spend (convenience, grocery, pharmacy) is 19% of transactions. BIN clustering present but below peak threshold at 2 merchants.',
     confidence: 87, verdict: 'FLAGGED',
   },
   {
     agentId: 'cash', caseId: 'CORR-002',
     steps: [
       { text: 'Aggregate ATM + prepaid reloads over 30-day window', metric: '$2,200 ($1,200 ATM + $1,000 prepaid)', threshold: 'Cash velocity ≥ 55%', triggered: true },
-      { text: 'Compute cash velocity ratio', metric: '63% cash-equivalent spend', threshold: '≥ 55%', triggered: true },
+      { text: 'Compute cash velocity ratio', metric: '82% cash-equivalent spend', threshold: '≥ 55%', triggered: true },
       { text: 'Account vintage check — new account, no spend baseline', metric: 'Account opened 34 days ago', threshold: 'New-account corridor entry', triggered: true },
     ],
-    finding: 'Cash velocity 63%. New account (34 days) entering corridor pattern immediately — no legitimate spend baseline.',
+    finding: 'Cash velocity 82%. New account (34 days) entering corridor pattern immediately — no legitimate spend baseline to compare against.',
     confidence: 88, verdict: 'FLAGGED',
   },
   {
