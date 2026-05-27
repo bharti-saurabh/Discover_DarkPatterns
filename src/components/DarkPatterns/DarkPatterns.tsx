@@ -441,51 +441,89 @@ function MetricCard({ label, value, peer, multiplier, anomaly }: { label: string
 
 function AgentSignalGrid({ findings }: { findings: AgentFinding[] }) {
   if (!findings.length) return null
-  const top = [...findings].sort((a, b) => b.confidence - a.confidence).find(f => f.verdict === 'FLAGGED')
+  const [modalAgentId, setModalAgentId] = useState<string | null>(null)
+  const modalFinding = modalAgentId ? findings.find(f => f.agentId === modalAgentId) ?? null : null
+  const modalAgent = modalAgentId ? AGENTS.find(a => a.id === modalAgentId) ?? null : null
+  const flagCount = findings.filter(f => f.verdict === 'FLAGGED').length
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+    <div className="space-y-3">
+      {modalFinding && modalAgent && (
+        <AgentDetailModal agent={modalAgent} finding={modalFinding} onClose={() => setModalAgentId(null)} />
+      )}
+
+      <div className="flex items-center justify-between">
         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Why This Was Flagged</span>
-        <div className="flex gap-2">
-          <span className="flex items-center gap-1 text-[8px] text-red-600"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> Flagged</span>
-          <span className="flex items-center gap-1 text-[8px] text-amber-600"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Review</span>
-        </div>
+        <span className="text-[8px] text-slate-400">{flagCount} agent{flagCount !== 1 ? 's' : ''} flagged · click a card for full intel</span>
       </div>
-      <div className="px-4 pt-3 pb-1 space-y-2.5">
+
+      <div className="grid grid-cols-2 gap-3">
         {findings.map(f => {
           const agent = AGENTS.find(a => a.id === f.agentId)!
           const isFlagged = f.verdict === 'FLAGGED'
-          const keyStep = f.steps.find(s => s.triggered) ?? f.steps[0]
+          const triggeredSteps = f.steps.filter(s => s.triggered)
+          const hasArtifacts = f.artifacts && f.artifacts.length > 0
+          const accentBorder = isFlagged ? 'border-l-red-400' : 'border-l-amber-400'
+          const hoverRing = isFlagged ? 'hover:border-red-300 hover:shadow-red-50/60' : 'hover:border-amber-300 hover:shadow-amber-50/60'
+
           return (
-            <div key={f.agentId} className="group relative">
-              <div className="flex items-center gap-3 mb-1">
-                <div className={`w-2 h-2 rounded-full shrink-0 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`} />
-                <span className="text-[8px] font-bold font-mono text-indigo-500 w-7 shrink-0">{agent.htRule}</span>
-                <span className="text-[10px] font-medium text-slate-700 w-28 shrink-0 truncate">{agent.name}</span>
+            <button
+              key={f.agentId}
+              onClick={() => setModalAgentId(f.agentId)}
+              className={`text-left bg-white border border-slate-200 border-l-4 ${accentBorder} rounded-xl p-4 hover:shadow-lg ${hoverRing} transition-all duration-150 group`}
+            >
+              {/* Header row */}
+              <div className="flex items-start gap-2 mb-3">
+                <span className="text-[8px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">{agent.htRule}</span>
+                <span className="text-[11px] font-bold text-slate-800 flex-1 leading-tight">{agent.name}</span>
+                <VerdictChip verdict={f.verdict} />
+              </div>
+
+              {/* Confidence bar */}
+              <div className="flex items-center gap-2 mb-3.5">
                 <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-700 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`} style={{ width: `${f.confidence}%` }} />
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`}
+                    style={{ width: `${f.confidence}%` }}
+                  />
                 </div>
-                <span className={`text-[9px] font-mono font-bold w-7 text-right shrink-0 ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>{f.confidence}%</span>
+                <span className={`text-[10px] font-bold font-mono tabular-nums shrink-0 ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>{f.confidence}%</span>
               </div>
-              {keyStep && (
-                <div className="ml-8 flex items-center gap-2">
-                  <span className="text-[8px] text-slate-400 truncate flex-1">{keyStep.text}</span>
-                  {keyStep.metric && <span className={`text-[8px] font-mono font-semibold shrink-0 ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>{keyStep.metric}</span>}
-                  {keyStep.threshold && <span className="text-[7px] text-slate-400 font-mono shrink-0">/ {keyStep.threshold}</span>}
-                </div>
-              )}
-              <div className="absolute left-20 top-full mt-1 hidden group-hover:block z-20 bg-slate-900 text-white text-[9px] rounded-lg px-2.5 py-1.5 max-w-xs shadow-xl pointer-events-none leading-snug whitespace-normal">
-                {f.finding}
+
+              {/* Triggered checks */}
+              <div className="space-y-1.5 mb-3">
+                {triggeredSteps.slice(0, 3).map((step, i) => (
+                  <div key={i} className="flex items-start gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-[4px] ${isFlagged ? 'bg-red-400' : 'bg-amber-400'}`} />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[9px] text-slate-600 leading-tight">{step.text}</span>
+                      {step.metric && (
+                        <span className={`ml-1 text-[9px] font-bold font-mono ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>&nbsp;{step.metric}</span>
+                      )}
+                      {step.threshold && (
+                        <span className="ml-1 text-[8px] text-slate-400 font-mono">/ {step.threshold}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+
+              {/* Finding snippet */}
+              <p className="text-[9px] text-slate-500 leading-snug line-clamp-2 italic mb-3">{f.finding}</p>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
+                {hasArtifacts
+                  ? <span className="text-[8px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-medium">{f.artifacts!.length} evidence tables</span>
+                  : <span />}
+                <span className="text-[8px] font-semibold text-indigo-500 group-hover:text-indigo-700 transition-colors">
+                  View evidence →
+                </span>
+              </div>
+            </button>
           )
         })}
       </div>
-      {top && (
-        <div className="mx-4 mb-3 mt-2 px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-[9px] leading-snug text-red-800">
-          <span className="font-bold">{AGENTS.find(a => a.id === top.agentId)?.name}: </span>{top.finding}
-        </div>
-      )}
     </div>
   )
 }
