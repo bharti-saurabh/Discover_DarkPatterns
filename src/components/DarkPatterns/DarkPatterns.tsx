@@ -454,7 +454,7 @@ function AgentSignalGrid({ findings }: { findings: AgentFinding[] }) {
 
       <div className="flex items-center justify-between">
         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Why This Was Flagged</span>
-        <span className="text-[8px] text-slate-400">{flagCount} agent{flagCount !== 1 ? 's' : ''} flagged · click a card for full intel</span>
+        <span className="text-[8px] text-slate-400">{flagCount} of {findings.length} agents flagged</span>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -463,62 +463,80 @@ function AgentSignalGrid({ findings }: { findings: AgentFinding[] }) {
           const isFlagged = f.verdict === 'FLAGGED'
           const triggeredSteps = f.steps.filter(s => s.triggered)
           const hasArtifacts = f.artifacts && f.artifacts.length > 0
-          const accentBorder = isFlagged ? 'border-l-red-400' : 'border-l-amber-400'
-          const hoverRing = isFlagged ? 'hover:border-red-300 hover:shadow-red-50/60' : 'hover:border-amber-300 hover:shadow-amber-50/60'
 
           return (
             <button
               key={f.agentId}
               onClick={() => setModalAgentId(f.agentId)}
-              className={`text-left bg-white border border-slate-200 border-l-4 ${accentBorder} rounded-xl p-4 hover:shadow-lg ${hoverRing} transition-all duration-150 group`}
+              className="text-left bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group"
             >
-              {/* Header row */}
-              <div className="flex items-start gap-2 mb-3">
-                <span className="text-[8px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded shrink-0 mt-0.5">{agent.htRule}</span>
-                <span className="text-[11px] font-bold text-slate-800 flex-1 leading-tight">{agent.name}</span>
-                <VerdictChip verdict={f.verdict} />
-              </div>
+              {/* Gradient top strip */}
+              <div className={`h-0.5 ${isFlagged
+                ? 'bg-gradient-to-r from-red-500 via-rose-400 to-red-300'
+                : 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-300'}`}
+              />
 
-              {/* Confidence bar */}
-              <div className="flex items-center gap-2 mb-3.5">
-                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div className="p-4">
+                {/* Header: name + confidence number */}
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-[8px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{agent.htRule}</span>
+                      <VerdictChip verdict={f.verdict} />
+                    </div>
+                    <div className="text-xs font-bold text-slate-900 leading-tight">{agent.name}</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className={`text-2xl font-black font-mono leading-none tabular-nums ${isFlagged ? 'text-red-600' : 'text-amber-500'}`}>
+                      {f.confidence}<span className="text-sm font-bold">%</span>
+                    </div>
+                    <div className="text-[8px] text-slate-400 mt-0.5">confidence</div>
+                  </div>
+                </div>
+
+                {/* Gradient progress bar */}
+                <div className="h-1 bg-slate-100 rounded-full overflow-hidden mb-4">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`}
+                    className={`h-full rounded-full ${isFlagged
+                      ? 'bg-gradient-to-r from-red-500 to-rose-400'
+                      : 'bg-gradient-to-r from-amber-400 to-yellow-300'}`}
                     style={{ width: `${f.confidence}%` }}
                   />
                 </div>
-                <span className={`text-[10px] font-bold font-mono tabular-nums shrink-0 ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>{f.confidence}%</span>
-              </div>
 
-              {/* Triggered checks */}
-              <div className="space-y-1.5 mb-3">
-                {triggeredSteps.slice(0, 3).map((step, i) => (
-                  <div key={i} className="flex items-start gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-[4px] ${isFlagged ? 'bg-red-400' : 'bg-amber-400'}`} />
-                    <div className="min-w-0 flex-1">
-                      <span className="text-[9px] text-slate-600 leading-tight">{step.text}</span>
-                      {step.metric && (
-                        <span className={`ml-1 text-[9px] font-bold font-mono ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>&nbsp;{step.metric}</span>
-                      )}
-                      {step.threshold && (
-                        <span className="ml-1 text-[8px] text-slate-400 font-mono">/ {step.threshold}</span>
-                      )}
+                {/* Triggered signals */}
+                <div className="space-y-2.5 mb-4">
+                  {triggeredSteps.slice(0, 3).map((step, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-px ${isFlagged ? 'bg-red-100' : 'bg-amber-100'}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${isFlagged ? 'bg-red-500' : 'bg-amber-500'}`} />
+                      </div>
+                      <div className="min-w-0 flex-1 leading-tight">
+                        <span className="text-[9px] text-slate-600">{step.text}</span>
+                        {step.metric && (
+                          <span className={`ml-1.5 inline-block text-[8px] font-bold font-mono px-1 py-0.5 rounded ${isFlagged ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'}`}>
+                            {step.metric}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div className={`flex items-center justify-between pt-3 border-t ${isFlagged ? 'border-red-100' : 'border-amber-100'}`}>
+                  <span className="text-[8px] text-slate-400">
+                    {hasArtifacts ? `${f.artifacts!.length} evidence tables` : ''}
+                  </span>
+                  <div className={`flex items-center gap-1 text-[9px] font-semibold transition-colors ${isFlagged
+                    ? 'text-red-500 group-hover:text-red-700'
+                    : 'text-amber-500 group-hover:text-amber-700'}`}>
+                    View intel
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
                   </div>
-                ))}
-              </div>
-
-              {/* Finding snippet */}
-              <p className="text-[9px] text-slate-500 leading-snug line-clamp-2 italic mb-3">{f.finding}</p>
-
-              {/* Footer */}
-              <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
-                {hasArtifacts
-                  ? <span className="text-[8px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-medium">{f.artifacts!.length} evidence tables</span>
-                  : <span />}
-                <span className="text-[8px] font-semibold text-indigo-500 group-hover:text-indigo-700 transition-colors">
-                  View evidence →
-                </span>
+                </div>
               </div>
             </button>
           )
