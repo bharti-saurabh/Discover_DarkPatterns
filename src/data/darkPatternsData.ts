@@ -98,6 +98,17 @@ export interface CrossCaseRef {
   relationship: string
 }
 
+export interface AccountContext {
+  cardType: string
+  cardAge: string
+  creditLimit: number
+  avgMonthlySpend: number
+  avgMonthlyTxns: number
+  typicalMccs: string[]
+  accountStatus: string
+  baselineCashPct: number
+}
+
 // ── Pattern 1: Geographic Corridor Cases ─────────────────────────────────────
 
 export interface CorridorStop {
@@ -120,9 +131,11 @@ export interface CorridorCase {
   cardholderIdB?: string
   corridor: string
   corridorLabel: string
+  corridorStartDate: string
   riskScore: number
   flaggedCategories: string[]
   homeCityState: string
+  accountContext: AccountContext
   stops: CorridorStop[]
   capOneSignal: string
   discoverSignal: string
@@ -139,9 +152,20 @@ export const CORRIDOR_CASES: CorridorCase[] = [
     cardholderIdB: 'DIS-002193',
     corridor: 'I95-NE',
     corridorLabel: 'I-95 Northeast',
+    corridorStartDate: '2026-04-07',
     riskScore: 94,
     flaggedCategories: ['14-MCC', '14-Cash', '14-Geo'],
     homeCityState: 'Boston, MA',
+    accountContext: {
+      cardType: 'Platinum Rewards Visa',
+      cardAge: '4 years, 2 months',
+      creditLimit: 12000,
+      avgMonthlySpend: 2340,
+      avgMonthlyTxns: 27,
+      typicalMccs: ['Grocery', 'Gas', 'Dining', 'Retail'],
+      accountStatus: 'Good Standing',
+      baselineCashPct: 0.04,
+    },
     capOneSignal: 'Account shows 14 hotel charges across 6 cities in 18 days. $2,200 in ATM withdrawals and $1,000 in prepaid card reloads across 6 stops — all cash-equivalent. No dining, grocery, or retail spend at any point. Behavior score dropped 180 points in 30 days.',
     discoverSignal: 'Three Discover-network hotels on the I-95 corridor each show a spike in cross-issuer card volume on the same nights this cardholder checked in — 8 to 14 other cards from different issuer BINs transacting at the same property within the same 4-hour window.',
     combinedInsight: 'The Cap One cardholder is not alone. Discover\'s network view shows coordinated multi-card activity at each hotel stop — different issuer BINs, same merchants, same time windows. This is not a business traveler. This is a coordinated pattern across at least 9 cards at the same 5 properties.',
@@ -173,9 +197,20 @@ export const CORRIDOR_CASES: CorridorCase[] = [
     cardholderIdA: 'CAP-007342',
     corridor: 'I10-S',
     corridorLabel: 'I-10 Southern',
+    corridorStartDate: '2026-03-12',
     riskScore: 87,
     flaggedCategories: ['14-MCC', '14-Cash', '14-Geo'],
     homeCityState: 'Houston, TX',
+    accountContext: {
+      cardType: 'Cash Back Mastercard',
+      cardAge: '34 days',
+      creditLimit: 5000,
+      avgMonthlySpend: 0,
+      avgMonthlyTxns: 0,
+      typicalMccs: [],
+      accountStatus: 'New Account',
+      baselineCashPct: 0,
+    },
     capOneSignal: 'Rapid city movement across 5 Texas/Louisiana cities in 10 days. $1,200 in ATM withdrawals and $1,000 in prepaid card reloads — $2,200 total cash-equivalent. No recurring merchant relationships — each hotel is new. Account opened 34 days ago.',
     discoverSignal: 'Two truck-stop-adjacent hotels on I-10 show the same cardholder co-occurring with 6–11 other multi-issuer cards. One Beaumont, TX property has appeared in 3 separate multi-card events in 45 days.',
     combinedInsight: 'New account (34 days old) immediately enters a high-frequency corridor pattern. Discover\'s network identifies the Beaumont property as a repeat venue — third coordinated event at the same merchant in 45 days, each time with a different set of cards from different issuers. The property is a nexus, not a coincidence.',

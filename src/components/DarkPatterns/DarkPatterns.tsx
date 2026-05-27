@@ -1,13 +1,13 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
 import { ReactFlow, Background, Controls, MarkerType, Handle, Position, type Node, type Edge } from '@xyflow/react'
 import {
   CORRIDOR_CASES, CONTROLLER_CASES, FRONT_BUSINESS_CASES, FINCEN_CATEGORIES,
-  type CorridorCase, type FrontBusinessCase, type ControllerCase,
+  type CorridorCase, type FrontBusinessCase, type ControllerCase, type AccountContext,
 } from '../../data/darkPatternsData'
 import {
   AGENTS, AGENT_FINDINGS, findingsForCase,
-  type AgentFinding,
+  type AgentFinding, type AgentDef,
 } from '../../data/agentData'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
@@ -106,6 +106,12 @@ function fmt$(n: number) {
 }
 function pct(n: number) { return `${(n * 100).toFixed(0)}%` }
 
+function dayToDate(startDate: string, day: number): string {
+  const d = new Date(startDate)
+  d.setDate(d.getDate() + (day - 1))
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 // ── CityTimeline ─────────────────────────────────────────────────────────────────
 
 function CityTimeline({ c }: { c: CorridorCase }) {
@@ -121,7 +127,7 @@ function CityTimeline({ c }: { c: CorridorCase }) {
         <div className="flex">
           <div className="w-28 shrink-0" />
           {days.map(d => (
-            <div key={d} className="w-10 text-center text-[9px] text-slate-400 font-medium pb-1.5">D{d}</div>
+            <div key={d} className="w-12 text-center text-[9px] text-slate-400 font-medium pb-1.5">{dayToDate(c.corridorStartDate, d)}</div>
           ))}
         </div>
         {cities.map((city, cityIdx) => (
@@ -130,7 +136,7 @@ function CityTimeline({ c }: { c: CorridorCase }) {
             {days.map(d => {
               const stop = stopMap.get(`${city}-${d}`)
               if (!stop) return (
-                <div key={d} className="w-10 h-9 flex items-center justify-center">
+                <div key={d} className="w-12 h-9 flex items-center justify-center">
                   <div className="w-1 h-1 rounded-full bg-slate-200" />
                 </div>
               )
@@ -139,12 +145,12 @@ function CityTimeline({ c }: { c: CorridorCase }) {
                 ? 'top-full mt-2'
                 : 'bottom-full mb-2'
               return (
-                <div key={d} className="w-10 h-9 flex items-center justify-center relative group">
+                <div key={d} className="w-12 h-9 flex items-center justify-center relative group">
                   <div className={`w-7 h-7 rounded-full ${MCC_DOT[dom.mcc] ?? 'bg-slate-400'} flex items-center justify-center shadow-sm ring-2 ring-white cursor-pointer`}>
                     <span className="text-white text-[8px] font-bold">{stop.transactions.length}</span>
                   </div>
                   <div className={`absolute ${tipPos} left-1/2 -translate-x-1/2 hidden group-hover:block z-20 w-52 bg-slate-900 text-white rounded-xl p-2.5 shadow-xl pointer-events-none`}>
-                    <div className="text-[10px] font-semibold mb-1.5">{city} · Day {d}</div>
+                    <div className="text-[10px] font-semibold mb-1.5">{city} · {dayToDate(c.corridorStartDate, d)}</div>
                     {stop.transactions.map((t, i) => (
                       <div key={i} className="flex items-center justify-between text-[9px] py-0.5">
                         <span className={`px-1.5 rounded font-medium ${MCC_PILL[t.mcc] ?? 'bg-slate-700 text-white'}`}>{t.mccLabel}</span>
@@ -310,25 +316,35 @@ function AgentSignalGrid({ findings }: { findings: AgentFinding[] }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Detection Signals</span>
+        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Why This Was Flagged</span>
         <div className="flex gap-2">
           <span className="flex items-center gap-1 text-[8px] text-red-600"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> Flagged</span>
           <span className="flex items-center gap-1 text-[8px] text-amber-600"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Review</span>
         </div>
       </div>
-      <div className="px-4 pt-3 pb-1 space-y-2">
+      <div className="px-4 pt-3 pb-1 space-y-2.5">
         {findings.map(f => {
           const agent = AGENTS.find(a => a.id === f.agentId)!
           const isFlagged = f.verdict === 'FLAGGED'
+          const keyStep = f.steps.find(s => s.triggered) ?? f.steps[0]
           return (
-            <div key={f.agentId} className="group relative flex items-center gap-3">
-              <div className={`w-2 h-2 rounded-full shrink-0 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`} />
-              <span className="text-[8px] font-bold font-mono text-indigo-500 w-7 shrink-0">{agent.htRule}</span>
-              <span className="text-[10px] font-medium text-slate-700 w-24 shrink-0 truncate">{agent.name}</span>
-              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-700 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`} style={{ width: `${f.confidence}%` }} />
+            <div key={f.agentId} className="group relative">
+              <div className="flex items-center gap-3 mb-1">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`} />
+                <span className="text-[8px] font-bold font-mono text-indigo-500 w-7 shrink-0">{agent.htRule}</span>
+                <span className="text-[10px] font-medium text-slate-700 w-28 shrink-0 truncate">{agent.name}</span>
+                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-700 ${isFlagged ? 'bg-red-500' : 'bg-amber-400'}`} style={{ width: `${f.confidence}%` }} />
+                </div>
+                <span className={`text-[9px] font-mono font-bold w-7 text-right shrink-0 ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>{f.confidence}%</span>
               </div>
-              <span className={`text-[9px] font-mono font-bold w-7 text-right shrink-0 ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>{f.confidence}%</span>
+              {keyStep && (
+                <div className="ml-8 flex items-center gap-2">
+                  <span className="text-[8px] text-slate-400 truncate flex-1">{keyStep.text}</span>
+                  {keyStep.metric && <span className={`text-[8px] font-mono font-semibold shrink-0 ${isFlagged ? 'text-red-600' : 'text-amber-600'}`}>{keyStep.metric}</span>}
+                  {keyStep.threshold && <span className="text-[7px] text-slate-400 font-mono shrink-0">/ {keyStep.threshold}</span>}
+                </div>
+              )}
               <div className="absolute left-20 top-full mt-1 hidden group-hover:block z-20 bg-slate-900 text-white text-[9px] rounded-lg px-2.5 py-1.5 max-w-xs shadow-xl pointer-events-none leading-snug whitespace-normal">
                 {f.finding}
               </div>
@@ -416,6 +432,153 @@ function MccBreakdown({ c }: { c: CorridorCase }) {
   )
 }
 
+// ── Account Context Banner ────────────────────────────────────────────────────────
+
+function AccountContextBanner({ c }: { c: CorridorCase }) {
+  const ctx: AccountContext = c.accountContext
+  const flaggedCashPct = (() => {
+    const total = c.stops.reduce((s, stop) => s + stop.transactions.reduce((ss, t) => ss + t.amount, 0), 0)
+    const cash = c.stops.reduce((s, stop) => s + stop.transactions.filter(t => ['6010', '6540'].includes(t.mcc)).reduce((ss, t) => ss + t.amount, 0), 0)
+    return total > 0 ? cash / total : 0
+  })()
+  const isNewAccount = ctx.cardAge.includes('day')
+
+  return (
+    <div className={`rounded-xl p-4 border ${isNewAccount ? 'bg-red-50 border-red-200' : 'bg-indigo-50 border-indigo-100'}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`text-[9px] font-bold uppercase tracking-wider ${isNewAccount ? 'text-red-600' : 'text-indigo-600'}`}>Account Profile</span>
+        <span className={`font-mono text-[9px] ${isNewAccount ? 'text-red-400' : 'text-indigo-400'}`}>{c.cardholderIdA}</span>
+        {isNewAccount && <span className="ml-auto text-[8px] font-bold bg-red-200 text-red-700 px-2 py-0.5 rounded-full">⚠ New Account</span>}
+      </div>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {[
+          { label: 'Card Type', value: ctx.cardType, highlight: false },
+          { label: 'Account Age', value: ctx.cardAge, highlight: isNewAccount },
+          { label: 'Credit Limit', value: fmt$(ctx.creditLimit), highlight: false },
+          { label: 'Avg Monthly Spend', value: ctx.avgMonthlySpend > 0 ? fmt$(ctx.avgMonthlySpend) : 'No history', highlight: ctx.avgMonthlySpend === 0 },
+          { label: 'Avg Monthly Txns', value: ctx.avgMonthlyTxns > 0 ? `${ctx.avgMonthlyTxns} / mo` : 'No history', highlight: ctx.avgMonthlyTxns === 0 },
+          { label: 'Account Status', value: ctx.accountStatus, highlight: ctx.accountStatus !== 'Good Standing' },
+        ].map(({ label, value, highlight }) => (
+          <div key={label} className="bg-white rounded-lg p-2.5">
+            <div className="text-[8px] text-slate-400 font-medium">{label}</div>
+            <div className={`text-[10px] font-semibold mt-0.5 leading-tight ${highlight ? 'text-red-600' : 'text-slate-800'}`}>{value}</div>
+          </div>
+        ))}
+      </div>
+      {ctx.typicalMccs.length > 0 && (
+        <div className="flex items-center gap-2 mb-2.5">
+          <span className="text-[8px] text-slate-500 font-medium shrink-0">Typical spend:</span>
+          <div className="flex flex-wrap gap-1">
+            {ctx.typicalMccs.map(m => (
+              <span key={m} className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">{m}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="bg-white rounded-lg p-2.5 flex items-center gap-4">
+        <div className="flex-1">
+          <div className="text-[8px] text-slate-400 font-medium mb-1.5">Baseline Cash Activity</div>
+          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-0.5">
+            <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${Math.min(ctx.baselineCashPct * 100, 100)}%` }} />
+          </div>
+          <div className="text-[8px] text-slate-500">{ctx.baselineCashPct > 0 ? `${(ctx.baselineCashPct * 100).toFixed(0)}% of typical spend` : 'No baseline — new account'}</div>
+        </div>
+        <div className="w-px h-10 bg-slate-200" />
+        <div className="flex-1">
+          <div className="text-[8px] text-slate-400 font-medium mb-1.5">Flagged Period Cash Activity</div>
+          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-0.5">
+            <div className="h-full bg-red-500 rounded-full" style={{ width: `${Math.min(flaggedCashPct * 100, 100)}%` }} />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="text-[8px] text-red-700 font-semibold">{(flaggedCashPct * 100).toFixed(0)}% of corridor spend</div>
+            {ctx.baselineCashPct > 0 && flaggedCashPct > ctx.baselineCashPct && (
+              <span className="text-[7px] bg-red-100 text-red-600 px-1 rounded font-bold">{(flaggedCashPct / ctx.baselineCashPct).toFixed(0)}× baseline</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Corridor Map (SVG) ────────────────────────────────────────────────────────────
+
+const CORRIDOR_COORDS: Record<string, { city: string; abbr: string; x: number; y: number }[]> = {
+  'I95-NE': [
+    { city: 'Boston', abbr: 'BOS', x: 178, y: 15 },
+    { city: 'Providence', abbr: 'PRV', x: 168, y: 35 },
+    { city: 'New York', abbr: 'NYC', x: 108, y: 68 },
+    { city: 'Philadelphia', abbr: 'PHL', x: 78, y: 95 },
+    { city: 'Baltimore', abbr: 'BAL', x: 40, y: 115 },
+    { city: 'Washington', abbr: 'DC', x: 28, y: 132 },
+  ],
+  'I10-S': [
+    { city: 'Houston', abbr: 'HOU', x: 12, y: 85 },
+    { city: 'Beaumont', abbr: 'BEA', x: 38, y: 55 },
+    { city: 'New Orleans', abbr: 'NOL', x: 90, y: 75 },
+    { city: 'Mobile', abbr: 'MOB', x: 122, y: 35 },
+    { city: 'Jacksonville', abbr: 'JAX', x: 192, y: 58 },
+  ],
+}
+
+const MCC_SVG_FILL: Record<string, string> = {
+  '7011': '#F43F5E', '4121': '#F59E0B',
+  '6540': '#A855F7', '6010': '#DC2626',
+  '7297': '#EC4899', '7299': '#EC4899',
+}
+
+function CorridorMap({ c }: { c: CorridorCase }) {
+  const coords = CORRIDOR_COORDS[c.corridor]
+  if (!coords) return null
+
+  const cityDomMcc: Record<string, string> = {}
+  c.stops.forEach(stop => {
+    const counts: Record<string, number> = {}
+    stop.transactions.forEach(t => { counts[t.mcc] = (counts[t.mcc] ?? 0) + 1 })
+    const dom = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0]
+    if (dom) cityDomMcc[stop.city] = dom
+  })
+
+  const pathD = coords.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+
+  return (
+    <div className="bg-slate-900 rounded-xl overflow-hidden" style={{ height: 168 }}>
+      <svg viewBox="0 0 210 155" className="w-full h-full">
+        <style>{`@keyframes drawRoute{to{stroke-dashoffset:0}}`}</style>
+        <rect width="210" height="155" fill="#0F172A" />
+        {/* faint grid */}
+        {[20,40,60,80,100,120,140].map(y => (
+          <line key={y} x1="0" y1={y} x2="210" y2={y} stroke="#1E293B" strokeWidth="0.5" />
+        ))}
+        {/* static dashed route */}
+        <path d={pathD} fill="none" stroke="#6366F1" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.35" />
+        {/* animated draw-on route */}
+        <path d={pathD} fill="none" stroke="#818CF8" strokeWidth="2" strokeLinecap="round"
+          pathLength="1" strokeDasharray="1" strokeDashoffset="1"
+          style={{ animation: 'drawRoute 2s ease-out 0.4s forwards' }} />
+        {/* city dots + labels */}
+        {coords.map(({ city, abbr, x, y }) => {
+          const mcc = Object.keys(cityDomMcc).length > 0
+            ? cityDomMcc[Object.keys(cityDomMcc).find(k => city.startsWith(k) || k.startsWith(city)) ?? ''] ?? cityDomMcc[city]
+            : undefined
+          const fill = mcc ? (MCC_SVG_FILL[mcc] ?? '#94A3B8') : '#94A3B8'
+          const labelY = y > 100 ? y - 9 : y + 15
+          const labelAnchor = x > 150 ? 'end' : x < 50 ? 'start' : 'middle'
+          return (
+            <g key={city}>
+              <circle cx={x} cy={y} r={5.5} fill="#0F172A" stroke={fill} strokeWidth="1.5" />
+              <circle cx={x} cy={y} r={3} fill={fill} />
+              <text x={x} y={labelY} textAnchor={labelAnchor} fill="#94A3B8" fontSize="7.5" fontFamily="monospace" fontWeight="bold">{abbr}</text>
+            </g>
+          )
+        })}
+        {/* corridor label */}
+        <text x="4" y="149" fill="#475569" fontSize="7" fontFamily="sans-serif" fontWeight="bold">{c.corridorLabel}</text>
+      </svg>
+    </div>
+  )
+}
+
 // ── Cardholder detail ─────────────────────────────────────────────────────────────
 
 function CardholderDetail({ c, findings, strategist }: { c: CorridorCase; findings: AgentFinding[]; strategist?: AgentFinding }) {
@@ -449,16 +612,25 @@ function CardholderDetail({ c, findings, strategist }: { c: CorridorCase; findin
         </div>
       </div>
 
+      <AccountContextBanner c={c} />
+
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold text-slate-800">Corridor Movement Timeline</h3>
+          <h3 className="text-xs font-bold text-slate-800">Corridor Movement</h3>
           <div className="flex items-center gap-3 text-[9px] text-slate-400">
             <span>{c.stops.length} stops</span>
             <span>{Math.max(...c.stops.map(s => s.day))} days</span>
-            <span>{c.homeCityState}</span>
+            <span>Origin: {c.homeCityState}</span>
           </div>
         </div>
-        <CityTimeline c={c} />
+        <div className="flex gap-4">
+          <div className="w-[38%] shrink-0">
+            <CorridorMap c={c} />
+          </div>
+          <div className="flex-1 overflow-x-auto min-w-0">
+            <CityTimeline c={c} />
+          </div>
+        </div>
         <MccBreakdown c={c} />
       </div>
 
@@ -728,24 +900,53 @@ function CaseRegistry({ selectedId, onSelect }: { selectedId: string | null; onS
 
 // ── Right panel: Agent Activity ───────────────────────────────────────────────────
 
-function CoTStepRow({ step, delay }: { step: AgentFinding['steps'][number]; delay: number }) {
-  const [visible, setVisible] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setVisible(true), delay)
-    return () => clearTimeout(t)
-  }, [delay])
-
-  if (!visible) return <div className="h-5" />
+function AgentDetailModal({ agent, finding, onClose }: { agent: AgentDef; finding: AgentFinding; onClose: () => void }) {
   return (
-    <div className="flex items-start gap-1.5 animate-in fade-in slide-in-from-left-1 duration-300">
-      <span className={`shrink-0 mt-0.5 w-3 h-3 rounded-full flex items-center justify-center ${step.triggered ? 'bg-red-500' : 'bg-slate-600'}`}>
-        {step.triggered
-          ? <svg width="6" height="6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-          : <svg width="5" height="5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
-      </span>
-      <div className="min-w-0">
-        <div className="text-[8px] text-slate-400 leading-tight">{step.text}</div>
-        {step.metric && <div className={`text-[8px] font-mono font-semibold mt-0.5 ${step.triggered ? 'text-red-400' : 'text-slate-500'}`}>→ {step.metric}</div>}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-slate-950 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl z-10 overflow-hidden max-h-[85vh] flex flex-col">
+        <div className="flex items-start justify-between px-5 py-4 border-b border-slate-800 shrink-0">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[8px] font-bold font-mono text-indigo-400">{agent.htRule}</span>
+              <VerdictChip verdict={finding.verdict} />
+            </div>
+            <div className="text-sm font-bold text-white">{agent.name}</div>
+            <div className="text-[10px] text-slate-400 mt-0.5 leading-snug max-w-sm">{agent.description}</div>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 shrink-0 ml-4 mt-0.5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-5 py-4 overflow-y-auto flex-1">
+          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-3">Analysis Steps</div>
+          <div className="rounded-lg overflow-hidden border border-slate-800">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-3 py-2 text-[8px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-800 bg-slate-900">
+              <span>Check</span><span>Observed</span><span>Threshold</span><span>Result</span>
+            </div>
+            {finding.steps.map((step, i) => (
+              <div key={i} className={`grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-3 py-2.5 border-b border-slate-900 last:border-0 ${step.triggered ? 'bg-red-950/20' : ''}`}>
+                <span className="text-[9px] text-slate-300 leading-snug">{step.text}</span>
+                <span className="text-[9px] font-mono text-amber-400 text-right whitespace-nowrap self-start">{step.metric ?? '—'}</span>
+                <span className="text-[9px] font-mono text-slate-500 text-right whitespace-nowrap self-start">{step.threshold ?? '—'}</span>
+                <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 self-start ${step.triggered ? 'bg-red-500' : 'bg-emerald-700'}`}>
+                  {step.triggered
+                    ? <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    : <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-5 py-4 bg-slate-900 border-t border-slate-800 shrink-0">
+          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-2">Finding</div>
+          <p className="text-[10px] text-slate-300 leading-relaxed mb-3">{finding.finding}</p>
+          <ConfidenceBar value={finding.confidence} dark />
+        </div>
       </div>
     </div>
   )
@@ -794,67 +995,130 @@ function AgentCasePanel({ caseId }: { caseId: string }) {
   const allFindings = findingsForCase(caseId)
   const findings = allFindings.filter(f => f.agentId !== 'strategist')
   const strategist = allFindings.find(f => f.agentId === 'strategist')
-  let globalDelay = 0
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [modal, setModal] = useState<string | null>(null)
+
+  const modalFinding = modal ? allFindings.find(f => f.agentId === modal) : null
+  const modalAgent = modal ? AGENTS.find(a => a.id === modal) : null
+
+  function toggle(id: string) { setExpanded(prev => prev === id ? null : id) }
+
+  function StepRow({ step }: { step: AgentFinding['steps'][number] }) {
+    return (
+      <div className="flex items-start gap-1.5">
+        <span className={`shrink-0 mt-0.5 w-3 h-3 rounded-full flex items-center justify-center ${step.triggered ? 'bg-red-500' : 'bg-slate-700'}`}>
+          {step.triggered
+            ? <svg width="6" height="6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            : <svg width="5" height="5" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+        </span>
+        <div className="min-w-0">
+          <div className="text-[8px] text-slate-400 leading-tight">{step.text}</div>
+          {(step.metric || step.threshold) && (
+            <div className="flex items-center gap-2 mt-0.5">
+              {step.metric && <span className={`text-[8px] font-mono font-semibold ${step.triggered ? 'text-red-400' : 'text-slate-500'}`}>{step.metric}</span>}
+              {step.threshold && <span className="text-[7px] text-slate-600 font-mono">thr: {step.threshold}</span>}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full">
+      {modalFinding && modalAgent && (
+        <AgentDetailModal agent={modalAgent} finding={modalFinding} onClose={() => setModal(null)} />
+      )}
+
       <div className="px-3 py-2.5 border-b border-slate-800 sticky top-0 bg-slate-950 z-10">
         <div className="flex items-center gap-1.5 mb-0.5">
           <PulseDot color="bg-indigo-500" />
-          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Agent Reasoning</span>
+          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Agent Analysis</span>
         </div>
-        <div className="text-[8px] text-slate-500">{caseId} · {findings.length + (strategist ? 1 : 0)} agents</div>
+        <div className="text-[8px] text-slate-500">{caseId} · click to expand · Full Analysis for artifacts</div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
         {findings.map(f => {
           const agent = AGENTS.find(a => a.id === f.agentId)!
-          const steps = f.steps.slice(0, 3)
-          const startDelay = globalDelay
-          globalDelay += steps.length * 250 + 350
+          const isOpen = expanded === f.agentId
           return (
-            <div key={f.agentId} className="bg-slate-900 rounded-lg p-2.5">
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-[7px] font-bold font-mono text-indigo-400">{agent.htRule}</span>
+            <div key={f.agentId} className="bg-slate-900 rounded-lg overflow-hidden">
+              <button
+                className="w-full flex items-center gap-2 px-2.5 py-2.5 hover:bg-slate-800 transition-colors text-left"
+                onClick={() => toggle(f.agentId)}
+              >
+                <div className={`w-2 h-2 rounded-full shrink-0 ${f.verdict === 'FLAGGED' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                <span className="text-[7px] font-bold font-mono text-indigo-400 w-7 shrink-0">{agent.htRule}</span>
                 <span className="text-[9px] font-semibold text-slate-200 flex-1 truncate">{agent.name}</span>
                 <VerdictChip verdict={f.verdict} />
-              </div>
-              <div className="space-y-1.5">
-                {steps.map((step, i) => <CoTStepRow key={i} step={step} delay={startDelay + i * 250} />)}
-                {f.steps.length > 3 && <div className="text-[7px] text-slate-600 pl-5">+{f.steps.length - 3} more checks…</div>}
-              </div>
-              <div className="mt-2 pt-2 border-t border-slate-800">
-                <p className="text-[8px] text-slate-400 leading-snug italic mb-1.5">{f.finding}</p>
-                <ConfidenceBar value={f.confidence} dark />
-              </div>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5" strokeLinecap="round"
+                  className={`shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {isOpen && (
+                <div className="px-2.5 pb-3 border-t border-slate-800">
+                  <div className="space-y-2 mt-2.5">
+                    {f.steps.map((step, i) => <StepRow key={i} step={step} />)}
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-800">
+                    <p className="text-[8px] text-slate-400 leading-snug italic mb-2.5">{f.finding}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1"><ConfidenceBar value={f.confidence} dark /></div>
+                      <button
+                        onClick={() => setModal(f.agentId)}
+                        className="shrink-0 text-[8px] font-semibold text-indigo-400 hover:text-indigo-300 border border-indigo-900/60 hover:border-indigo-700 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                      >
+                        Full Analysis →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )
         })}
 
-        {strategist && (() => {
-          const steps = strategist.steps.slice(0, 3)
-          const startDelay = globalDelay
-          return (
-            <div className="border-t border-slate-800 pt-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <PulseDot color="bg-red-500" />
-                <span className="text-[9px] font-semibold text-white flex-1">Case Strategist</span>
-                <VerdictChip verdict={strategist.verdict} />
+        {strategist && (
+          <div className="bg-slate-900 rounded-lg overflow-hidden">
+            <button
+              className="w-full flex items-center gap-2 px-2.5 py-2.5 hover:bg-slate-800 transition-colors text-left"
+              onClick={() => toggle('strategist')}
+            >
+              <PulseDot color="bg-red-500" />
+              <span className="text-[9px] font-semibold text-white flex-1">Case Strategist</span>
+              <VerdictChip verdict={strategist.verdict} />
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5" strokeLinecap="round"
+                className={`shrink-0 transition-transform duration-200 ${expanded === 'strategist' ? 'rotate-180' : ''}`}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {expanded === 'strategist' && (
+              <div className="px-2.5 pb-3 border-t border-slate-800">
+                <div className="space-y-2 mt-2.5">
+                  {strategist.steps.map((step, i) => <StepRow key={i} step={step} />)}
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-700">
+                  <p className="text-[8px] text-red-300 leading-snug italic font-semibold mb-2.5">{strategist.finding}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1"><ConfidenceBar value={strategist.confidence} dark /></div>
+                    <button
+                      onClick={() => setModal('strategist')}
+                      className="shrink-0 text-[8px] font-semibold text-indigo-400 hover:text-indigo-300 border border-indigo-900/60 hover:border-indigo-700 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                    >
+                      Full Analysis →
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                {steps.map((step, i) => <CoTStepRow key={i} step={step} delay={startDelay + i * 250} />)}
-              </div>
-              <div className="mt-2 pt-2 border-t border-slate-700">
-                <p className="text-[8px] text-red-300 leading-snug italic font-semibold mb-1.5">{strategist.finding}</p>
-                <ConfidenceBar value={strategist.confidence} dark />
-              </div>
-            </div>
-          )
-        })()}
+            )}
+          </div>
+        )}
       </div>
 
       <div className="px-3 py-2 border-t border-slate-800 bg-slate-950 shrink-0">
-        <div className="text-[8px] text-slate-500">Analysis: 2024-11-15 00:31 UTC</div>
+        <div className="text-[8px] text-slate-500">Analysis completed · {caseId}</div>
       </div>
     </div>
   )
