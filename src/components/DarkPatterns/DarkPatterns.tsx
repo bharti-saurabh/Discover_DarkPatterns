@@ -8,6 +8,7 @@ import {
 import {
   AGENTS, AGENT_FINDINGS, findingsForCase,
   type AgentFinding, type AgentDef,
+  type Artifact, type TableArtifact, type MetricGridArtifact, type IntelListArtifact, type ChecklistArtifact,
 } from '../../data/agentData'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
@@ -88,15 +89,14 @@ function VerdictChip({ verdict }: { verdict: 'FLAGGED' | 'REVIEW' | 'PASS' }) {
   return <span className={`text-[7px] font-bold px-1.5 py-0.5 rounded ${cls}`}>{verdict}</span>
 }
 
-function ConfidenceBar({ value, dark = false }: { value: number; dark?: boolean }) {
+function ConfidenceBar({ value }: { value: number }) {
   const color = value >= 90 ? 'bg-red-500' : value >= 80 ? 'bg-orange-500' : 'bg-amber-500'
-  const track = dark ? 'bg-slate-700' : 'bg-slate-200'
   return (
     <div className="flex items-center gap-2">
-      <div className={`flex-1 h-1 ${track} rounded-full overflow-hidden`}>
+      <div className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden">
         <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{ width: `${value}%` }} />
       </div>
-      <span className={`text-[8px] font-mono ${dark ? 'text-slate-400' : 'text-slate-500'}`}>{value}%</span>
+      <span className="text-[8px] font-mono text-slate-500">{value}%</span>
     </div>
   )
 }
@@ -112,6 +112,131 @@ function dayToDate(startDate: string, day: number): string {
   const d = new Date(startDate)
   d.setDate(d.getDate() + (day - 1))
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// ── Artifact renderers ────────────────────────────────────────────────────────────
+
+function ArtifactTable({ artifact }: { artifact: TableArtifact }) {
+  return (
+    <div className="rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+        <div className="text-xs font-semibold text-slate-800">{artifact.title}</div>
+        {artifact.subtitle && <div className="text-[9px] text-slate-500 mt-0.5">{artifact.subtitle}</div>}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[10px]">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/60">
+              {artifact.columns.map((col, i) => (
+                <th key={i} className={`px-3 py-2 font-semibold text-slate-500 whitespace-nowrap ${col.right ? 'text-right' : 'text-left'}`}>{col.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {artifact.rows.map((row, ri) => (
+              <tr key={ri} className={`border-b border-slate-100 last:border-0 ${row.flagged ? 'bg-red-50' : row.muted ? 'bg-slate-50/40' : ''}`}>
+                {row.cells.map((cell, ci) => (
+                  <td key={ci} className={[
+                    'px-3 py-2 leading-snug whitespace-nowrap',
+                    artifact.columns[ci]?.right ? 'text-right' : '',
+                    artifact.columns[ci]?.mono ? 'font-mono' : '',
+                    row.flagged ? 'text-red-800' : row.muted ? 'text-slate-400' : 'text-slate-700',
+                  ].join(' ')}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {artifact.note && (
+        <div className="px-4 py-2.5 bg-amber-50 border-t border-amber-100 text-[9px] text-amber-800 leading-snug">{artifact.note}</div>
+      )}
+    </div>
+  )
+}
+
+function ArtifactMetricGrid({ artifact }: { artifact: MetricGridArtifact }) {
+  const cols = artifact.cols ?? 2
+  const gridCls = cols === 4 ? 'grid-cols-4' : cols === 3 ? 'grid-cols-3' : 'grid-cols-2'
+  return (
+    <div className="rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+        <div className="text-xs font-semibold text-slate-800">{artifact.title}</div>
+      </div>
+      <div className={`grid ${gridCls} gap-2.5 p-3`}>
+        {artifact.metrics.map((m, i) => (
+          <div key={i} className={`rounded-lg p-2.5 border ${m.flagged ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
+            <div className="text-[8px] text-slate-500 font-medium mb-1 leading-tight">{m.label}</div>
+            <div className={`text-sm font-bold leading-none ${m.flagged ? 'text-red-700' : 'text-slate-900'}`}>{m.value}</div>
+            {m.peer && <div className="text-[8px] text-slate-400 mt-1 leading-tight">{m.peer}</div>}
+            {m.delta && <div className={`text-[8px] font-semibold mt-0.5 leading-tight ${m.flagged ? 'text-red-600' : 'text-indigo-600'}`}>{m.delta}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ArtifactIntelList({ artifact }: { artifact: IntelListArtifact }) {
+  return (
+    <div className="rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+        <div className="text-xs font-semibold text-slate-800">{artifact.title}</div>
+      </div>
+      <div className="p-3 space-y-2">
+        {artifact.items.map((item, i) => (
+          <div key={i} className={`flex items-start gap-2.5 p-2.5 rounded-lg ${item.flagged ? 'bg-red-50 border border-red-100' : 'bg-slate-50'}`}>
+            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${item.flagged ? 'bg-red-500' : 'bg-indigo-400'}`} />
+            <div className="min-w-0">
+              <div className={`text-[10px] font-medium leading-snug ${item.flagged ? 'text-red-800' : 'text-slate-700'}`}>{item.text}</div>
+              {item.detail && <div className="text-[9px] text-slate-500 mt-0.5 leading-snug">{item.detail}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ArtifactChecklist({ artifact }: { artifact: ChecklistArtifact }) {
+  const triggered = artifact.items.filter(i => i.triggered).length
+  return (
+    <div className="rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-start justify-between gap-2">
+        <div>
+          <div className="text-xs font-semibold text-slate-800">{artifact.title}</div>
+          {artifact.subtitle && <div className="text-[9px] text-slate-500 mt-0.5">{artifact.subtitle}</div>}
+        </div>
+        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${triggered >= 6 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+          {triggered}/{artifact.items.length} triggered
+        </span>
+      </div>
+      <div className="p-3 space-y-1.5">
+        {artifact.items.map((item, i) => (
+          <div key={i} className={`flex items-start gap-2.5 p-2.5 rounded-lg ${item.triggered ? 'bg-red-50' : 'bg-slate-50'}`}>
+            <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${item.triggered ? 'bg-red-500' : 'bg-emerald-500'}`}>
+              {item.triggered
+                ? <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                : <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+            </div>
+            <div className="min-w-0">
+              <div className={`text-[10px] font-medium leading-snug ${item.triggered ? 'text-red-800' : 'text-slate-600'}`}>{item.label}</div>
+              <div className="text-[9px] text-slate-500 mt-0.5 leading-snug">{item.detail}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function renderArtifact(artifact: Artifact, key: number) {
+  switch (artifact.type) {
+    case 'table': return <ArtifactTable key={key} artifact={artifact} />
+    case 'metric-grid': return <ArtifactMetricGrid key={key} artifact={artifact} />
+    case 'intel-list': return <ArtifactIntelList key={key} artifact={artifact} />
+    case 'checklist': return <ArtifactChecklist key={key} artifact={artifact} />
+  }
 }
 
 // ── CityTimeline ─────────────────────────────────────────────────────────────────
@@ -390,14 +515,14 @@ function FinCENPanel({ categories }: { categories: string[] }) {
 
 function StrategistVerdict({ f }: { f: AgentFinding }) {
   return (
-    <div className="bg-gradient-to-r from-slate-900 to-red-950 border border-red-900/50 rounded-xl p-4">
+    <div className="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-4">
       <div className="flex items-center gap-2 mb-2">
         <PulseDot color="bg-red-500" />
-        <span className="text-sm font-bold text-white">Case Strategist Verdict</span>
+        <span className="text-sm font-bold text-slate-900">Case Strategist Verdict</span>
         <span className="ml-auto text-[9px] font-bold bg-red-600 text-white px-2 py-0.5 rounded-full">{f.verdict}</span>
       </div>
-      <p className="text-[11px] text-slate-200 leading-relaxed mb-2.5">{f.finding}</p>
-      <ConfidenceBar value={f.confidence} dark />
+      <p className="text-[11px] text-slate-700 leading-relaxed mb-2.5">{f.finding}</p>
+      <ConfidenceBar value={f.confidence} />
     </div>
   )
 }
@@ -781,23 +906,23 @@ function CaseRegistry({ selectedId, onSelect }: { selectedId: string | null; onS
                   const sel = selectedId === c.id
                   return (
                     <button key={c.id} onClick={() => onSelect(c.id)}
-                      className={`w-full text-left rounded-lg p-2.5 transition-all border ${sel ? 'bg-slate-900 border-slate-700 shadow-md' : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}>
+                      className={`w-full text-left rounded-lg p-2.5 transition-all border ${sel ? 'bg-indigo-600 border-indigo-500 shadow-md' : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}>
                       <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className={`font-mono text-[9px] font-bold ${sel ? 'text-slate-400' : 'text-slate-500'}`}>{c.id}</span>
+                        <span className={`font-mono text-[9px] font-bold ${sel ? 'text-indigo-200' : 'text-slate-500'}`}>{c.id}</span>
                         <RiskBadge score={c.riskScore} />
                       </div>
                       <div className={`text-[10px] font-semibold leading-tight mb-1 ${sel ? 'text-white' : 'text-slate-800'}`}>{c.label}</div>
-                      <div className={`text-[9px] ${sel ? 'text-slate-400' : 'text-slate-500'}`}>{c.sub}</div>
+                      <div className={`text-[9px] ${sel ? 'text-indigo-200' : 'text-slate-500'}`}>{c.sub}</div>
                       <div className="flex items-center gap-1.5 mt-1.5">
-                        <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full ${sel ? 'bg-red-900 text-red-400' : 'bg-red-50 text-red-600'}`}>
+                        <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full ${sel ? 'bg-white/20 text-white' : 'bg-red-50 text-red-600'}`}>
                           {c.agentHits} flagged
                         </span>
                         <div className="flex gap-0.5 flex-wrap">
                           {c.flaggedCategories.slice(0, 2).map(id => (
-                            <span key={id} className={`text-[7px] font-bold px-1 py-0.5 rounded font-mono ${sel ? 'bg-slate-800 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>{id}</span>
+                            <span key={id} className={`text-[7px] font-bold px-1 py-0.5 rounded font-mono ${sel ? 'bg-indigo-700 text-indigo-200' : 'bg-amber-50 text-amber-700'}`}>{id}</span>
                           ))}
                           {c.flaggedCategories.length > 2 && (
-                            <span className={`text-[7px] px-1 py-0.5 rounded ${sel ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>+{c.flaggedCategories.length - 2}</span>
+                            <span className={`text-[7px] px-1 py-0.5 rounded ${sel ? 'bg-indigo-700 text-indigo-300' : 'bg-slate-100 text-slate-500'}`}>+{c.flaggedCategories.length - 2}</span>
                           )}
                         </div>
                       </div>
@@ -820,51 +945,63 @@ function CaseRegistry({ selectedId, onSelect }: { selectedId: string | null; onS
 // ── Right panel: Agent Activity ───────────────────────────────────────────────────
 
 function AgentDetailModal({ agent, finding, onClose }: { agent: AgentDef; finding: AgentFinding; onClose: () => void }) {
+  const hasArtifacts = finding.artifacts && finding.artifacts.length > 0
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-slate-950 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl z-10 overflow-hidden max-h-[85vh] flex flex-col">
-        <div className="flex items-start justify-between px-5 py-4 border-b border-slate-800 shrink-0">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className={`relative bg-white rounded-2xl w-full ${hasArtifacts ? 'max-w-3xl' : 'max-w-lg'} border border-slate-200 shadow-2xl z-10 overflow-hidden max-h-[90vh] flex flex-col`}>
+        <div className="flex items-start justify-between px-5 py-4 border-b border-slate-200 shrink-0">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[8px] font-bold font-mono text-indigo-400">{agent.htRule}</span>
+              <span className="text-[8px] font-bold font-mono text-indigo-600">{agent.htRule}</span>
               <VerdictChip verdict={finding.verdict} />
             </div>
-            <div className="text-sm font-bold text-white">{agent.name}</div>
-            <div className="text-[10px] text-slate-400 mt-0.5 leading-snug max-w-sm">{agent.description}</div>
+            <div className="text-sm font-bold text-slate-900">{agent.name}</div>
+            <div className="text-[10px] text-slate-500 mt-0.5 leading-snug max-w-sm">{agent.description}</div>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 shrink-0 ml-4 mt-0.5">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0 ml-4 mt-0.5">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         </div>
 
-        <div className="px-5 py-4 overflow-y-auto flex-1">
-          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-3">Analysis Steps</div>
-          <div className="rounded-lg overflow-hidden border border-slate-800">
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-3 py-2 text-[8px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-800 bg-slate-900">
-              <span>Check</span><span>Observed</span><span>Threshold</span><span>Result</span>
-            </div>
-            {finding.steps.map((step, i) => (
-              <div key={i} className={`grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-3 py-2.5 border-b border-slate-900 last:border-0 ${step.triggered ? 'bg-red-950/20' : ''}`}>
-                <span className="text-[9px] text-slate-300 leading-snug">{step.text}</span>
-                <span className="text-[9px] font-mono text-amber-400 text-right whitespace-nowrap self-start">{step.metric ?? '—'}</span>
-                <span className="text-[9px] font-mono text-slate-500 text-right whitespace-nowrap self-start">{step.threshold ?? '—'}</span>
-                <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 self-start ${step.triggered ? 'bg-red-500' : 'bg-emerald-700'}`}>
-                  {step.triggered
-                    ? <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                    : <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
-                </div>
+        <div className="px-5 py-4 overflow-y-auto flex-1 space-y-5">
+          {/* Chain-of-Thought Steps */}
+          <div>
+            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-3">Analysis Steps</div>
+            <div className="rounded-xl overflow-hidden border border-slate-200">
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-3 py-2 text-[8px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 bg-slate-50">
+                <span>Check</span><span>Observed</span><span>Threshold</span><span>Result</span>
               </div>
-            ))}
+              {finding.steps.map((step, i) => (
+                <div key={i} className={`grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-3 py-2.5 border-b border-slate-100 last:border-0 ${step.triggered ? 'bg-red-50' : ''}`}>
+                  <span className="text-[9px] text-slate-700 leading-snug">{step.text}</span>
+                  <span className="text-[9px] font-mono text-amber-600 text-right whitespace-nowrap self-start">{step.metric ?? '—'}</span>
+                  <span className="text-[9px] font-mono text-slate-400 text-right whitespace-nowrap self-start">{step.threshold ?? '—'}</span>
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 self-start ${step.triggered ? 'bg-red-500' : 'bg-emerald-500'}`}>
+                    {step.triggered
+                      ? <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                      : <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Artifacts */}
+          {hasArtifacts && (
+            <div className="space-y-4">
+              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Supporting Evidence</div>
+              {finding.artifacts!.map((a, i) => renderArtifact(a, i))}
+            </div>
+          )}
         </div>
 
-        <div className="px-5 py-4 bg-slate-900 border-t border-slate-800 shrink-0">
+        <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 shrink-0">
           <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-2">Finding</div>
-          <p className="text-[10px] text-slate-300 leading-relaxed mb-3">{finding.finding}</p>
-          <ConfidenceBar value={finding.confidence} dark />
+          <p className="text-[10px] text-slate-700 leading-relaxed mb-3">{finding.finding}</p>
+          <ConfidenceBar value={finding.confidence} />
         </div>
       </div>
     </div>
@@ -874,37 +1011,37 @@ function AgentDetailModal({ agent, finding, onClose }: { agent: AgentDef; findin
 function AgentScanningPanel() {
   return (
     <div className="flex flex-col h-full">
-      <div className="px-3 py-2.5 border-b border-slate-800 sticky top-0 bg-slate-950 z-10">
+      <div className="px-3 py-2.5 border-b border-slate-200 sticky top-0 bg-white z-10">
         <div className="flex items-center gap-1.5 mb-0.5">
           <PulseDot color="bg-emerald-500" />
-          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Agent Activity</span>
+          <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Agent Activity</span>
         </div>
-        <div className="text-[8px] text-slate-500">7 agents scanning continuously</div>
+        <div className="text-[8px] text-slate-400">7 agents scanning continuously</div>
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {AGENTS.map(agent => {
           const hits = AGENT_FINDINGS.filter(f => f.agentId === agent.id && f.verdict === 'FLAGGED').length
           return (
-            <div key={agent.id} className="bg-slate-900 rounded-lg p-2.5">
+            <div key={agent.id} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5">
               <div className="flex items-center gap-1.5 mb-1.5">
-                <PulseDot color={hits > 0 ? 'bg-emerald-500' : 'bg-slate-600'} />
-                <span className="text-[9px] font-semibold text-slate-200 flex-1 truncate">{agent.name}</span>
-                {hits > 0 && <span className="text-[8px] font-bold bg-red-900 text-red-400 px-1.5 py-0.5 rounded-full">{hits} hit{hits > 1 ? 's' : ''}</span>}
+                <PulseDot color={hits > 0 ? 'bg-emerald-500' : 'bg-slate-300'} />
+                <span className="text-[9px] font-semibold text-slate-700 flex-1 truncate">{agent.name}</span>
+                {hits > 0 && <span className="text-[8px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">{hits} hit{hits > 1 ? 's' : ''}</span>}
               </div>
               <div className="flex items-center gap-1 mb-1.5">
-                <span className="text-[7px] font-bold text-indigo-400 font-mono">{agent.htRule}</span>
-                <span className="text-[7px] text-slate-600">·</span>
-                <span className="text-[7px] text-slate-500">{agent.scanCount} {agent.scanLabel}</span>
+                <span className="text-[7px] font-bold text-indigo-600 font-mono">{agent.htRule}</span>
+                <span className="text-[7px] text-slate-300">·</span>
+                <span className="text-[7px] text-slate-400">{agent.scanCount} {agent.scanLabel}</span>
               </div>
-              <div className="h-0.5 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-600 rounded-full animate-pulse" style={{ width: hits > 0 ? '100%' : '55%' }} />
+              <div className="h-0.5 bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-500 rounded-full animate-pulse" style={{ width: hits > 0 ? '100%' : '55%' }} />
               </div>
             </div>
           )
         })}
       </div>
-      <div className="px-3 py-2 border-t border-slate-800 bg-slate-950 shrink-0">
-        <div className="text-[8px] text-slate-500">Last full scan: 2024-11-15 00:31 UTC</div>
+      <div className="px-3 py-2 border-t border-slate-200 bg-white shrink-0">
+        <div className="text-[8px] text-slate-400">Last full scan: 2024-11-15 00:31 UTC</div>
       </div>
     </div>
   )
@@ -925,17 +1062,17 @@ function AgentCasePanel({ caseId }: { caseId: string }) {
   function StepRow({ step }: { step: AgentFinding['steps'][number] }) {
     return (
       <div className="flex items-start gap-1.5">
-        <span className={`shrink-0 mt-0.5 w-3 h-3 rounded-full flex items-center justify-center ${step.triggered ? 'bg-red-500' : 'bg-slate-700'}`}>
+        <span className={`shrink-0 mt-0.5 w-3 h-3 rounded-full flex items-center justify-center ${step.triggered ? 'bg-red-500' : 'bg-slate-300'}`}>
           {step.triggered
             ? <svg width="6" height="6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            : <svg width="5" height="5" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+            : <svg width="5" height="5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
         </span>
         <div className="min-w-0">
-          <div className="text-[8px] text-slate-400 leading-tight">{step.text}</div>
+          <div className="text-[8px] text-slate-600 leading-tight">{step.text}</div>
           {(step.metric || step.threshold) && (
             <div className="flex items-center gap-2 mt-0.5">
-              {step.metric && <span className={`text-[8px] font-mono font-semibold ${step.triggered ? 'text-red-400' : 'text-slate-500'}`}>{step.metric}</span>}
-              {step.threshold && <span className="text-[7px] text-slate-600 font-mono">thr: {step.threshold}</span>}
+              {step.metric && <span className={`text-[8px] font-mono font-semibold ${step.triggered ? 'text-red-600' : 'text-slate-500'}`}>{step.metric}</span>}
+              {step.threshold && <span className="text-[7px] text-slate-400 font-mono">thr: {step.threshold}</span>}
             </div>
           )}
         </div>
@@ -949,45 +1086,47 @@ function AgentCasePanel({ caseId }: { caseId: string }) {
         <AgentDetailModal agent={modalAgent} finding={modalFinding} onClose={() => setModal(null)} />
       )}
 
-      <div className="px-3 py-2.5 border-b border-slate-800 sticky top-0 bg-slate-950 z-10">
+      <div className="px-3 py-2.5 border-b border-slate-200 sticky top-0 bg-white z-10">
         <div className="flex items-center gap-1.5 mb-0.5">
           <PulseDot color="bg-indigo-500" />
-          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Agent Analysis</span>
+          <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Agent Analysis</span>
         </div>
-        <div className="text-[8px] text-slate-500">{caseId} · click to expand · Full Analysis for artifacts</div>
+        <div className="text-[8px] text-slate-400">{caseId} · click to expand · Full Analysis for deep intel</div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
         {findings.map(f => {
           const agent = AGENTS.find(a => a.id === f.agentId)!
           const isOpen = expanded === f.agentId
+          const hasArtifacts = f.artifacts && f.artifacts.length > 0
           return (
-            <div key={f.agentId} className="bg-slate-900 rounded-lg overflow-hidden">
+            <div key={f.agentId} className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
               <button
-                className="w-full flex items-center gap-2 px-2.5 py-2.5 hover:bg-slate-800 transition-colors text-left"
+                className="w-full flex items-center gap-2 px-2.5 py-2.5 hover:bg-slate-50 transition-colors text-left"
                 onClick={() => toggle(f.agentId)}
               >
                 <div className={`w-2 h-2 rounded-full shrink-0 ${f.verdict === 'FLAGGED' ? 'bg-red-500' : 'bg-amber-400'}`} />
-                <span className="text-[7px] font-bold font-mono text-indigo-400 w-7 shrink-0">{agent.htRule}</span>
-                <span className="text-[9px] font-semibold text-slate-200 flex-1 truncate">{agent.name}</span>
+                <span className="text-[7px] font-bold font-mono text-indigo-600 w-7 shrink-0">{agent.htRule}</span>
+                <span className="text-[9px] font-semibold text-slate-700 flex-1 truncate">{agent.name}</span>
+                {hasArtifacts && <span className="text-[7px] bg-indigo-50 text-indigo-600 px-1 py-0.5 rounded font-bold shrink-0">intel</span>}
                 <VerdictChip verdict={f.verdict} />
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5" strokeLinecap="round"
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round"
                   className={`shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
               </button>
               {isOpen && (
-                <div className="px-2.5 pb-3 border-t border-slate-800">
+                <div className="px-2.5 pb-3 border-t border-slate-100">
                   <div className="space-y-2 mt-2.5">
                     {f.steps.map((step, i) => <StepRow key={i} step={step} />)}
                   </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-800">
-                    <p className="text-[8px] text-slate-400 leading-snug italic mb-2.5">{f.finding}</p>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100">
+                    <p className="text-[8px] text-slate-500 leading-snug italic mb-2.5">{f.finding}</p>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1"><ConfidenceBar value={f.confidence} dark /></div>
+                      <div className="flex-1"><ConfidenceBar value={f.confidence} /></div>
                       <button
                         onClick={() => setModal(f.agentId)}
-                        className="shrink-0 text-[8px] font-semibold text-indigo-400 hover:text-indigo-300 border border-indigo-900/60 hover:border-indigo-700 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                        className="shrink-0 text-[8px] font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-400 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors whitespace-nowrap"
                       >
                         Full Analysis →
                       </button>
@@ -1000,31 +1139,34 @@ function AgentCasePanel({ caseId }: { caseId: string }) {
         })}
 
         {strategist && (
-          <div className="bg-slate-900 rounded-lg overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
             <button
-              className="w-full flex items-center gap-2 px-2.5 py-2.5 hover:bg-slate-800 transition-colors text-left"
+              className="w-full flex items-center gap-2 px-2.5 py-2.5 hover:bg-slate-50 transition-colors text-left"
               onClick={() => toggle('strategist')}
             >
               <PulseDot color="bg-red-500" />
-              <span className="text-[9px] font-semibold text-white flex-1">Case Strategist</span>
+              <span className="text-[9px] font-semibold text-slate-800 flex-1">Case Strategist</span>
+              {strategist.artifacts && strategist.artifacts.length > 0 && (
+                <span className="text-[7px] bg-indigo-50 text-indigo-600 px-1 py-0.5 rounded font-bold shrink-0">intel</span>
+              )}
               <VerdictChip verdict={strategist.verdict} />
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5" strokeLinecap="round"
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round"
                 className={`shrink-0 transition-transform duration-200 ${expanded === 'strategist' ? 'rotate-180' : ''}`}>
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
             {expanded === 'strategist' && (
-              <div className="px-2.5 pb-3 border-t border-slate-800">
+              <div className="px-2.5 pb-3 border-t border-slate-100">
                 <div className="space-y-2 mt-2.5">
                   {strategist.steps.map((step, i) => <StepRow key={i} step={step} />)}
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-700">
-                  <p className="text-[8px] text-red-300 leading-snug italic font-semibold mb-2.5">{strategist.finding}</p>
+                <div className="mt-3 pt-2.5 border-t border-slate-100">
+                  <p className="text-[8px] text-red-700 leading-snug italic font-semibold mb-2.5">{strategist.finding}</p>
                   <div className="flex items-center gap-2">
-                    <div className="flex-1"><ConfidenceBar value={strategist.confidence} dark /></div>
+                    <div className="flex-1"><ConfidenceBar value={strategist.confidence} /></div>
                     <button
                       onClick={() => setModal('strategist')}
-                      className="shrink-0 text-[8px] font-semibold text-indigo-400 hover:text-indigo-300 border border-indigo-900/60 hover:border-indigo-700 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                      className="shrink-0 text-[8px] font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-400 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors whitespace-nowrap"
                     >
                       Full Analysis →
                     </button>
@@ -1036,8 +1178,8 @@ function AgentCasePanel({ caseId }: { caseId: string }) {
         )}
       </div>
 
-      <div className="px-3 py-2 border-t border-slate-800 bg-slate-950 shrink-0">
-        <div className="text-[8px] text-slate-500">Analysis completed · {caseId}</div>
+      <div className="px-3 py-2 border-t border-slate-200 bg-white shrink-0">
+        <div className="text-[8px] text-slate-400">Analysis completed · {caseId}</div>
       </div>
     </div>
   )
@@ -1057,7 +1199,7 @@ export default function DarkPatterns() {
     <div className="flex h-full overflow-hidden">
       <CaseRegistry selectedId={selectedCaseId} onSelect={handleSelectCase} />
       <CenterPanel key={selectedCaseId ?? 'empty'} caseId={selectedCaseId} />
-      <div className="w-[270px] shrink-0 border-l border-slate-200 bg-slate-950 overflow-hidden flex flex-col">
+      <div className="w-[270px] shrink-0 border-l border-slate-200 bg-white overflow-hidden flex flex-col">
         {selectedCaseId
           ? <AgentCasePanel key={selectedCaseId} caseId={selectedCaseId} />
           : <AgentScanningPanel />
