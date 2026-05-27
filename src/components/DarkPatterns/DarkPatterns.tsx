@@ -124,7 +124,7 @@ function CityTimeline({ c }: { c: CorridorCase }) {
             <div key={d} className="w-10 text-center text-[9px] text-slate-400 font-medium pb-1.5">D{d}</div>
           ))}
         </div>
-        {cities.map(city => (
+        {cities.map((city, cityIdx) => (
           <div key={city} className="flex items-center mb-1.5">
             <div className="w-28 shrink-0 text-[10px] font-medium text-slate-600 pr-2 truncate">{city}</div>
             {days.map(d => {
@@ -135,12 +135,15 @@ function CityTimeline({ c }: { c: CorridorCase }) {
                 </div>
               )
               const dom = stop.transactions[0]
+              const tipPos = cityIdx < 2
+                ? 'top-full mt-2'
+                : 'bottom-full mb-2'
               return (
                 <div key={d} className="w-10 h-9 flex items-center justify-center relative group">
                   <div className={`w-7 h-7 rounded-full ${MCC_DOT[dom.mcc] ?? 'bg-slate-400'} flex items-center justify-center shadow-sm ring-2 ring-white cursor-pointer`}>
                     <span className="text-white text-[8px] font-bold">{stop.transactions.length}</span>
                   </div>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20 w-52 bg-slate-900 text-white rounded-xl p-2.5 shadow-xl pointer-events-none">
+                  <div className={`absolute ${tipPos} left-1/2 -translate-x-1/2 hidden group-hover:block z-20 w-52 bg-slate-900 text-white rounded-xl p-2.5 shadow-xl pointer-events-none`}>
                     <div className="text-[10px] font-semibold mb-1.5">{city} · Day {d}</div>
                     {stop.transactions.map((t, i) => (
                       <div key={i} className="flex items-center justify-between text-[9px] py-0.5">
