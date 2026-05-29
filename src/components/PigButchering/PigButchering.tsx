@@ -263,7 +263,7 @@ function TransferChart({ c }: { c: PBCase }) {
 
 // ── Agent Signal Cards ────────────────────────────────────────────────────────────
 
-function PBAgentSignalCards({ findings, caseId }: { findings: PBFinding[]; caseId: string }) {
+function PBAgentSignalCards({ findings }: { findings: PBFinding[] }) {
   const [modalAgentId, setModalAgentId] = useState<string | null>(null)
   const modalFinding = modalAgentId ? findings.find(f => f.agentId === modalAgentId) ?? null : null
   const modalAgent = modalAgentId ? PB_AGENTS.find(a => a.id === modalAgentId) ?? null : null
@@ -492,7 +492,7 @@ function VictimDetail({ c }: { c: PBCase }) {
       </div>
 
       {/* Agent signal cards */}
-      <PBAgentSignalCards findings={nonStratFindings} caseId={c.id} />
+      <PBAgentSignalCards findings={nonStratFindings} />
 
       {/* FinCEN panel */}
       <PBFinCENPanel categories={c.flaggedCategories} />
