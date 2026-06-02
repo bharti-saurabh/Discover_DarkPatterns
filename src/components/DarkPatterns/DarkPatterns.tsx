@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, Fragment } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
 import { ReactFlow, Background, Controls, MarkerType, Handle, Position, type Node, type Edge } from '@xyflow/react'
 import {
@@ -7,12 +7,13 @@ import {
 } from '../../data/darkPatternsData'
 import {
   AGENTS, AGENT_FINDINGS, findingsForCase,
-  type AgentFinding, type AgentDef,
+  type AgentFinding, type AgentDef, type SarBrief,
   type Artifact, type TableArtifact, type MetricGridArtifact, type IntelListArtifact, type ChecklistArtifact,
 } from '../../data/agentData'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
+type InvPhase = 'idle' | 'detecting' | 'dispatching' | 'investigating' | 'synthesizing' | 'complete'
 type EntityType = 'cardholder' | 'merchant' | 'cluster'
 
 interface CaseEntry {
@@ -439,12 +440,132 @@ function MetricCard({ label, value, peer, multiplier, anomaly }: { label: string
   )
 }
 
-function AgentSignalGrid({ findings }: { findings: AgentFinding[] }) {
+// ── Investigation Pipeline strip ──────────────────────────────────────────────────
+
+function InvestigationPipeline({ caseId, invPhase, completedAgents }: {
+  caseId: string; invPhase: InvPhase; completedAgents: string[]
+}) {
+  const nonStrat = findingsForCase(caseId).filter(f => f.agentId !== 'strategist')
+  const doneCount = completedAgents.filter(id => id !== 'strategist').length
+  const hasStrat  = completedAgents.includes('strategist')
+
+  const stages = [
+    { label: 'Rule Engine',             done: !['idle','detecting'].includes(invPhase),   active: invPhase === 'detecting' },
+    { label: `${doneCount}/${nonStrat.length} Agents`, done: ['synthesizing','complete'].includes(invPhase), active: ['dispatching','investigating'].includes(invPhase) },
+    { label: 'Strategist',              done: hasStrat,                                   active: invPhase === 'synthesizing' },
+    { label: 'SAR Brief',               done: invPhase === 'complete',                    active: false },
+  ]
+
+  const statusText: Record<InvPhase, string> = {
+    idle: '', detecting: 'Scanning 47,823 accounts…', dispatching: 'Dispatching agents…',
+    investigating: `${doneCount} of ${nonStrat.length} agents complete`,
+    synthesizing: 'Synthesizing findings…', complete: 'Investigation complete',
+  }
+
+  return (
+    <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 mb-4">
+      {stages.map((s, i) => (
+        <Fragment key={i}>
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-semibold transition-all ${
+            s.done   ? 'bg-emerald-100 text-emerald-700' :
+            s.active ? 'bg-indigo-100 text-indigo-700' :
+                       'bg-slate-100 text-slate-400'
+          }`}>
+            {s.done   && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+            {s.active && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse inline-block" />}
+            {!s.done && !s.active && <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />}
+            {s.label}
+          </div>
+          {i < stages.length - 1 && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={s.done ? '#6EE7B7' : '#CBD5E1'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          )}
+        </Fragment>
+      ))}
+      {invPhase !== 'idle' && (
+        <span className={`ml-auto text-[8px] shrink-0 ${invPhase === 'complete' ? 'text-emerald-600 font-semibold' : 'text-slate-400 animate-pulse'}`}>
+          {statusText[invPhase]}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ── SAR Brief card ────────────────────────────────────────────────────────────────
+
+function SarBriefCard({ brief }: { brief: SarBrief }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div className="bg-white rounded-2xl border-2 border-red-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-red-600 to-red-700 px-5 py-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className="text-[8px] font-black bg-white/20 text-white px-2 py-0.5 rounded tracking-widest uppercase">Draft SAR</span>
+              <span className="text-[9px] font-bold bg-white text-red-700 px-2 py-0.5 rounded">{brief.type}</span>
+            </div>
+            <div className="text-sm font-black text-white leading-tight">{brief.typology}</div>
+            <div className="text-[10px] text-red-200 mt-0.5">{brief.fincenRef}</div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-[8px] text-red-200 uppercase tracking-wider">Filing deadline</div>
+            <div className="text-sm font-black text-white">{brief.filingDeadline}</div>
+            <div className="text-[8px] text-red-200">30-day clock</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-b border-red-100">
+        <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">FinCEN Indicators Triggered</div>
+        <div className="space-y-2">
+          {brief.indicators.map((ind, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <div className="w-4 h-4 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-px">
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="3.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <p className="text-[10px] text-slate-700 leading-snug">{ind}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-b border-red-100">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">SAR Narrative — Draft</div>
+          <button onClick={() => setExpanded(e => !e)} className="text-[9px] text-indigo-600 hover:text-indigo-800 font-semibold">
+            {expanded ? 'Collapse' : 'Read full'}
+          </button>
+        </div>
+        <p className={`text-[10px] text-slate-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>{brief.narrative}</p>
+      </div>
+
+      <div className="px-5 py-4 bg-red-50">
+        <div className="text-[9px] font-bold text-red-700 uppercase tracking-wider mb-1.5">Recommendation</div>
+        <p className="text-[10px] text-red-800 font-medium leading-snug mb-3">{brief.recommendation}</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          {brief.jointFiling?.map(id => (
+            <span key={id} className="text-[8px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded">Joint filing: {id}</span>
+          ))}
+          {brief.victimReferral && (
+            <span className="text-[8px] bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded">Victim services referral</span>
+          )}
+          <button className="ml-auto text-[9px] font-bold bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700 transition-colors">
+            Submit for Review →
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AgentSignalGrid({ findings, revealedIds }: { findings: AgentFinding[]; revealedIds?: string[] }) {
   if (!findings.length) return null
+  const visible = revealedIds ? findings.filter(f => revealedIds.includes(f.agentId)) : findings
   const [modalAgentId, setModalAgentId] = useState<string | null>(null)
   const modalFinding = modalAgentId ? findings.find(f => f.agentId === modalAgentId) ?? null : null
   const modalAgent = modalAgentId ? AGENTS.find(a => a.id === modalAgentId) ?? null : null
-  const flagCount = findings.filter(f => f.verdict === 'FLAGGED').length
+  const flagCount = visible.filter(f => f.verdict === 'FLAGGED').length
+
+  if (visible.length === 0) return null
 
   return (
     <div className="space-y-3">
@@ -454,11 +575,11 @@ function AgentSignalGrid({ findings }: { findings: AgentFinding[] }) {
 
       <div className="flex items-center justify-between">
         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Why This Was Flagged</span>
-        <span className="text-[8px] text-slate-400">{flagCount} of {findings.length} agents flagged</span>
+        <span className="text-[8px] text-slate-400">{flagCount} of {visible.length} agents flagged</span>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {findings.map(f => {
+        {visible.map(f => {
           const agent = AGENTS.find(a => a.id === f.agentId)!
           const isFlagged = f.verdict === 'FLAGGED'
           const triggeredSteps = f.steps.filter(s => s.triggered)
@@ -688,9 +809,14 @@ function AccountContextBanner({ c }: { c: CorridorCase }) {
 
 // ── Cardholder detail ─────────────────────────────────────────────────────────────
 
-function CardholderDetail({ c, findings, strategist }: { c: CorridorCase; findings: AgentFinding[]; strategist?: AgentFinding }) {
+function CardholderDetail({ c, findings, strategist, invPhase, completedAgents }: {
+  c: CorridorCase; findings: AgentFinding[]; strategist?: AgentFinding
+  invPhase: InvPhase; completedAgents: string[]
+}) {
   return (
     <div className="space-y-4">
+      <InvestigationPipeline caseId={c.id} invPhase={invPhase} completedAgents={completedAgents} />
+
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-start justify-between">
           <div>
@@ -734,20 +860,24 @@ function CardholderDetail({ c, findings, strategist }: { c: CorridorCase; findin
         <MccBreakdown c={c} />
       </div>
 
-      <AgentSignalGrid findings={findings} />
+      <AgentSignalGrid findings={findings} revealedIds={invPhase === 'idle' ? undefined : completedAgents.filter(id => id !== 'strategist')} />
       <FinCENPanel categories={c.flaggedCategories} />
-      {strategist && <StrategistVerdict f={strategist} />}
+      {invPhase === 'complete' && strategist?.sarBrief && <SarBriefCard brief={strategist.sarBrief} />}
     </div>
   )
 }
 
 // ── Merchant detail ───────────────────────────────────────────────────────────────
 
-function MerchantDetail({ c, findings, strategist }: { c: FrontBusinessCase; findings: AgentFinding[]; strategist?: AgentFinding }) {
+function MerchantDetail({ c, findings, strategist, invPhase, completedAgents }: {
+  c: FrontBusinessCase; findings: AgentFinding[]; strategist?: AgentFinding
+  invPhase: InvPhase; completedAgents: string[]
+}) {
   const volMultiplier = c.peerMonthlyVolume > 0 ? `${(c.monthlyVolume / c.peerMonthlyVolume).toFixed(1)}×` : undefined
   const cnpMultiplier = `${(c.cnpPct * 100).toFixed(0)}% vs 30%`
   return (
     <div className="space-y-4">
+      <InvestigationPipeline caseId={c.id} invPhase={invPhase} completedAgents={completedAgents} />
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-start justify-between">
           <div>
@@ -781,19 +911,23 @@ function MerchantDetail({ c, findings, strategist }: { c: FrontBusinessCase; fin
         <HourChart data={c.hourlyVolume} nightPct={c.nightPct} />
       </div>
 
-      <AgentSignalGrid findings={findings} />
+      <AgentSignalGrid findings={findings} revealedIds={invPhase === 'idle' ? undefined : completedAgents.filter(id => id !== 'strategist')} />
       <FinCENPanel categories={c.flaggedCategories} />
-      {strategist && <StrategistVerdict f={strategist} />}
+      {invPhase === 'complete' && strategist?.sarBrief && <SarBriefCard brief={strategist.sarBrief} />}
     </div>
   )
 }
 
 // ── Cluster detail ────────────────────────────────────────────────────────────────
 
-function ClusterDetail({ c, findings, strategist }: { c: ControllerCase; findings: AgentFinding[]; strategist?: AgentFinding }) {
+function ClusterDetail({ c, findings, strategist, invPhase, completedAgents }: {
+  c: ControllerCase; findings: AgentFinding[]; strategist?: AgentFinding
+  invPhase: InvPhase; completedAgents: string[]
+}) {
   const { nodes, edges } = useMemo(() => buildClusterGraph(c), [c])
   return (
     <div className="space-y-4">
+      <InvestigationPipeline caseId={c.id} invPhase={invPhase} completedAgents={completedAgents} />
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-start justify-between">
           <div>
@@ -864,16 +998,18 @@ function ClusterDetail({ c, findings, strategist }: { c: ControllerCase; finding
         </div>
       )}
 
-      <AgentSignalGrid findings={findings} />
+      <AgentSignalGrid findings={findings} revealedIds={invPhase === 'idle' ? undefined : completedAgents.filter(id => id !== 'strategist')} />
       <FinCENPanel categories={c.flaggedCategories} />
-      {strategist && <StrategistVerdict f={strategist} />}
+      {invPhase === 'complete' && strategist?.sarBrief && <SarBriefCard brief={strategist.sarBrief} />}
     </div>
   )
 }
 
 // ── Center panel dispatcher ───────────────────────────────────────────────────────
 
-function CenterPanel({ caseId }: { caseId: string | null }) {
+function CenterPanel({ caseId, invPhase, completedAgents }: {
+  caseId: string | null; invPhase: InvPhase; completedAgents: string[]
+}) {
   if (!caseId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center bg-slate-50 px-8">
@@ -882,9 +1018,13 @@ function CenterPanel({ caseId }: { caseId: string | null }) {
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
           </svg>
         </div>
-        <div className="text-sm font-semibold text-slate-700 mb-1">Select a case to investigate</div>
-        <div className="text-[10px] text-slate-400 max-w-52 leading-relaxed">
-          Choose a case from the registry to view evidence, visualizations, and agent reasoning.
+        <div className="text-sm font-semibold text-slate-700 mb-2">Select a case to investigate</div>
+        <p className="text-[10px] text-slate-400 max-w-60 leading-relaxed mb-2">
+          The rule engine scans 47,823 accounts continuously. Select a flagged case to launch the agentic investigation pipeline.
+        </p>
+        <div className="flex items-center gap-1.5 text-[9px] text-slate-400 bg-white border border-slate-200 rounded-full px-3 py-1.5 mt-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+          Rule engine active · {AGENT_FINDINGS.filter(f => f.verdict === 'FLAGGED').length} flags · {ALL_CASES.length} cases
         </div>
         <div className="grid grid-cols-3 gap-3 mt-6 w-full max-w-xs">
           {[
@@ -910,15 +1050,15 @@ function CenterPanel({ caseId }: { caseId: string | null }) {
     <div className="flex-1 min-w-0 overflow-y-auto bg-slate-50 px-4 py-4">
       {entry.entityType === 'cardholder' && (() => {
         const c = CORRIDOR_CASES.find(x => x.id === caseId)!
-        return <CardholderDetail c={c} findings={findings} strategist={strategist} />
+        return <CardholderDetail c={c} findings={findings} strategist={strategist} invPhase={invPhase} completedAgents={completedAgents} />
       })()}
       {entry.entityType === 'merchant' && (() => {
         const c = FRONT_BUSINESS_CASES.find(x => x.id === caseId)!
-        return <MerchantDetail c={c} findings={findings} strategist={strategist} />
+        return <MerchantDetail c={c} findings={findings} strategist={strategist} invPhase={invPhase} completedAgents={completedAgents} />
       })()}
       {entry.entityType === 'cluster' && (() => {
         const c = CONTROLLER_CASES.find(x => x.id === caseId)!
-        return <ClusterDetail c={c} findings={findings} strategist={strategist} />
+        return <ClusterDetail c={c} findings={findings} strategist={strategist} invPhase={invPhase} completedAgents={completedAgents} />
       })()}
     </div>
   )
@@ -1103,38 +1243,25 @@ function AgentScanningPanel() {
   )
 }
 
-function AgentCasePanel({ caseId }: { caseId: string }) {
-  const allFindings = findingsForCase(caseId)
-  const findings = allFindings.filter(f => f.agentId !== 'strategist')
-  const strategist = allFindings.find(f => f.agentId === 'strategist')
-  const [expanded, setExpanded] = useState<string | null>(null)
+// ── Right panel: Live investigation feed ─────────────────────────────────────────
+
+function AgentCasePanel({ caseId, invPhase, completedAgents }: {
+  caseId: string; invPhase: InvPhase; completedAgents: string[]
+}) {
+  const allFindings  = findingsForCase(caseId)
+  const nonStrat     = allFindings.filter(f => f.agentId !== 'strategist')
+  const strategist   = allFindings.find(f => f.agentId === 'strategist')
   const [modal, setModal] = useState<string | null>(null)
+  const modalFinding = modal ? allFindings.find(f => f.agentId === modal) ?? null : null
+  const modalAgent   = modal ? AGENTS.find(a => a.id === modal) ?? null : null
 
-  const modalFinding = modal ? allFindings.find(f => f.agentId === modal) : null
-  const modalAgent = modal ? AGENTS.find(a => a.id === modal) : null
+  const triggeredRules = nonStrat
+    .filter(f => f.steps.some(s => s.triggered))
+    .map(f => AGENTS.find(a => a.id === f.agentId)?.htRule)
+    .filter(Boolean) as string[]
 
-  function toggle(id: string) { setExpanded(prev => prev === id ? null : id) }
-
-  function StepRow({ step }: { step: AgentFinding['steps'][number] }) {
-    return (
-      <div className="flex items-start gap-1.5">
-        <span className={`shrink-0 mt-0.5 w-3 h-3 rounded-full flex items-center justify-center ${step.triggered ? 'bg-red-500' : 'bg-slate-300'}`}>
-          {step.triggered
-            ? <svg width="6" height="6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            : <svg width="5" height="5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
-        </span>
-        <div className="min-w-0">
-          <div className="text-[8px] text-slate-600 leading-tight">{step.text}</div>
-          {(step.metric || step.threshold) && (
-            <div className="flex items-center gap-2 mt-0.5">
-              {step.metric && <span className={`text-[8px] font-mono font-semibold ${step.triggered ? 'text-red-600' : 'text-slate-500'}`}>{step.metric}</span>}
-              {step.threshold && <span className="text-[7px] text-slate-400 font-mono">thr: {step.threshold}</span>}
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
+  const headerText = invPhase === 'complete' ? 'Investigation Complete' : 'Agent Investigation'
+  const headerColor = invPhase === 'complete' ? 'bg-emerald-500' : 'bg-indigo-500'
 
   return (
     <div className="flex flex-col h-full">
@@ -1142,100 +1269,132 @@ function AgentCasePanel({ caseId }: { caseId: string }) {
         <AgentDetailModal agent={modalAgent} finding={modalFinding} onClose={() => setModal(null)} />
       )}
 
+      {/* Header */}
       <div className="px-3 py-2.5 border-b border-slate-200 sticky top-0 bg-white z-10">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <PulseDot color="bg-indigo-500" />
-          <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Agent Analysis</span>
+          {invPhase === 'complete'
+            ? <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            : <PulseDot color={headerColor} />}
+          <span className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">{headerText}</span>
         </div>
-        <div className="text-[8px] text-slate-400">{caseId} · click to expand · Full Analysis for deep intel</div>
+        <div className="text-[8px] text-slate-400">{caseId}</div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-        {findings.map(f => {
-          const agent = AGENTS.find(a => a.id === f.agentId)!
-          const isOpen = expanded === f.agentId
-          const hasArtifacts = f.artifacts && f.artifacts.length > 0
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+
+        {/* Phase: detecting */}
+        {invPhase !== 'idle' && (
+          <div className={`rounded-xl border p-3 transition-all duration-500 ${
+            invPhase === 'detecting' ? 'bg-indigo-50 border-indigo-200' : 'bg-emerald-50 border-emerald-200'
+          }`}>
+            <div className="flex items-center gap-2 mb-1.5">
+              {invPhase === 'detecting'
+                ? <PulseDot color="bg-indigo-500" />
+                : <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />}
+              <span className="text-[9px] font-bold text-slate-700">Rule Engine</span>
+            </div>
+            <div className="text-[8px] text-slate-500 mb-2">
+              {invPhase === 'detecting' ? 'Scanning 47,823 accounts…' : '47,823 accounts scanned'}
+            </div>
+            {invPhase !== 'detecting' && triggeredRules.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {triggeredRules.map(rule => (
+                  <span key={rule} className="text-[7px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-mono">{rule} triggered</span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Phase: dispatching */}
+        {invPhase === 'dispatching' && (
+          <div className="rounded-xl border bg-indigo-50 border-indigo-200 p-3">
+            <div className="flex items-center gap-2">
+              <PulseDot color="bg-indigo-500" />
+              <span className="text-[9px] font-bold text-indigo-700">Dispatching {nonStrat.length} specialist agents…</span>
+            </div>
+          </div>
+        )}
+
+        {/* Agents — appear one by one */}
+        {['investigating','synthesizing','complete'].includes(invPhase) && nonStrat.map(f => {
+          const agent  = AGENTS.find(a => a.id === f.agentId)!
+          const done   = completedAgents.includes(f.agentId)
+          const active = !done && invPhase === 'investigating'
           return (
-            <div key={f.agentId} className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-              <button
-                className="w-full flex items-center gap-2 px-2.5 py-2.5 hover:bg-slate-50 transition-colors text-left"
-                onClick={() => toggle(f.agentId)}
-              >
-                <div className={`w-2 h-2 rounded-full shrink-0 ${f.verdict === 'FLAGGED' ? 'bg-red-500' : 'bg-amber-400'}`} />
+            <div key={f.agentId} className={`rounded-xl border p-3 transition-all duration-300 ${
+              done ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-1.5">
+                {done
+                  ? <div className={`w-2 h-2 rounded-full shrink-0 ${f.verdict === 'FLAGGED' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                  : <PulseDot color={active ? 'bg-slate-400' : 'bg-slate-300'} />}
                 <span className="text-[7px] font-bold font-mono text-indigo-600 w-7 shrink-0">{agent.htRule}</span>
                 <span className="text-[9px] font-semibold text-slate-700 flex-1 truncate">{agent.name}</span>
-                {hasArtifacts && <span className="text-[7px] bg-indigo-50 text-indigo-600 px-1 py-0.5 rounded font-bold shrink-0">intel</span>}
-                <VerdictChip verdict={f.verdict} />
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round"
-                  className={`shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-              {isOpen && (
-                <div className="px-2.5 pb-3 border-t border-slate-100">
-                  <div className="space-y-2 mt-2.5">
-                    {f.steps.map((step, i) => <StepRow key={i} step={step} />)}
+                {done && <VerdictChip verdict={f.verdict} />}
+                {!done && active && <span className="text-[8px] text-slate-400 italic">Analyzing…</span>}
+              </div>
+              {done && (
+                <>
+                  <ConfidenceBar value={f.confidence} />
+                  <div className="mt-2 flex justify-end">
+                    <button onClick={() => setModal(f.agentId)}
+                      className="text-[8px] font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors">
+                      Full Analysis →
+                    </button>
                   </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100">
-                    <p className="text-[8px] text-slate-500 leading-snug italic mb-2.5">{f.finding}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1"><ConfidenceBar value={f.confidence} /></div>
-                      <button
-                        onClick={() => setModal(f.agentId)}
-                        className="shrink-0 text-[8px] font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-400 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors whitespace-nowrap"
-                      >
-                        Full Analysis →
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                </>
               )}
             </div>
           )
         })}
 
-        {strategist && (
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-            <button
-              className="w-full flex items-center gap-2 px-2.5 py-2.5 hover:bg-slate-50 transition-colors text-left"
-              onClick={() => toggle('strategist')}
-            >
-              <PulseDot color="bg-red-500" />
-              <span className="text-[9px] font-semibold text-slate-800 flex-1">Case Strategist</span>
-              {strategist.artifacts && strategist.artifacts.length > 0 && (
-                <span className="text-[7px] bg-indigo-50 text-indigo-600 px-1 py-0.5 rounded font-bold shrink-0">intel</span>
+        {/* Strategist */}
+        {['synthesizing','complete'].includes(invPhase) && strategist && (() => {
+          const done = completedAgents.includes('strategist')
+          return (
+            <div className={`rounded-xl border p-3 transition-all duration-300 ${
+              done ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-1.5">
+                {done ? <PulseDot color="bg-red-500" /> : <PulseDot color="bg-amber-400" />}
+                <span className="text-[9px] font-bold text-slate-800 flex-1">Case Strategist</span>
+                {done && <VerdictChip verdict={strategist.verdict} />}
+              </div>
+              {!done && (
+                <p className="text-[8px] text-slate-400 italic">
+                  Synthesizing {completedAgents.filter(id => id !== 'strategist').length} agent findings…
+                </p>
               )}
-              <VerdictChip verdict={strategist.verdict} />
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round"
-                className={`shrink-0 transition-transform duration-200 ${expanded === 'strategist' ? 'rotate-180' : ''}`}>
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {expanded === 'strategist' && (
-              <div className="px-2.5 pb-3 border-t border-slate-100">
-                <div className="space-y-2 mt-2.5">
-                  {strategist.steps.map((step, i) => <StepRow key={i} step={step} />)}
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-100">
-                  <p className="text-[8px] text-red-700 leading-snug italic font-semibold mb-2.5">{strategist.finding}</p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1"><ConfidenceBar value={strategist.confidence} /></div>
-                    <button
-                      onClick={() => setModal('strategist')}
-                      className="shrink-0 text-[8px] font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-400 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors whitespace-nowrap"
-                    >
+              {done && (
+                <>
+                  <ConfidenceBar value={strategist.confidence} />
+                  <div className="mt-2 flex justify-end">
+                    <button onClick={() => setModal('strategist')}
+                      className="text-[8px] font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors">
                       Full Analysis →
                     </button>
                   </div>
-                </div>
-              </div>
-            )}
+                </>
+              )}
+            </div>
+          )
+        })()}
+
+        {/* SAR ready nudge */}
+        {invPhase === 'complete' && strategist?.sarBrief && (
+          <div className="bg-red-600 rounded-xl p-3 text-center">
+            <div className="text-[9px] font-black text-white mb-0.5">SAR Brief Ready</div>
+            <div className="text-[8px] text-red-200">{strategist.sarBrief.type} · Due {strategist.sarBrief.filingDeadline}</div>
+            <div className="text-[7px] text-red-300 mt-1">See case panel below ↓</div>
           </div>
         )}
       </div>
 
       <div className="px-3 py-2 border-t border-slate-200 bg-white shrink-0">
-        <div className="text-[8px] text-slate-400">Analysis completed · {caseId}</div>
+        <div className="text-[8px] text-slate-400">
+          {invPhase === 'complete' ? `Investigation complete · ${caseId}` : `${caseId} · In progress…`}
+        </div>
       </div>
     </div>
   )
@@ -1243,10 +1402,43 @@ function AgentCasePanel({ caseId }: { caseId: string }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────────
 
+const AGENT_TIMING_MS = [2200, 3500, 4800, 6100]
+
 export default function DarkPatterns() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
+  const [invPhase, setInvPhase]             = useState<InvPhase>('idle')
+  const [completedAgents, setCompletedAgents] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!selectedCaseId) { setInvPhase('idle'); setCompletedAgents([]); return }
+
+    const nonStrat = AGENT_FINDINGS.filter(f => f.caseId === selectedCaseId && f.agentId !== 'strategist')
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+    setInvPhase('detecting')
+    setCompletedAgents([])
+
+    timers.push(setTimeout(() => setInvPhase('dispatching'), 700))
+    timers.push(setTimeout(() => setInvPhase('investigating'), 1300))
+
+    nonStrat.forEach((f, i) => {
+      const t = 1300 + (AGENT_TIMING_MS[i] ?? AGENT_TIMING_MS[AGENT_TIMING_MS.length - 1] + (i - AGENT_TIMING_MS.length + 1) * 1200)
+      timers.push(setTimeout(() => setCompletedAgents(prev => [...prev, f.agentId]), t))
+    })
+
+    const lastT = 1300 + (AGENT_TIMING_MS[Math.min(nonStrat.length - 1, AGENT_TIMING_MS.length - 1)] ?? 2200)
+    timers.push(setTimeout(() => setInvPhase('synthesizing'), lastT + 500))
+    timers.push(setTimeout(() => {
+      setCompletedAgents(prev => [...prev, 'strategist'])
+      setInvPhase('complete')
+    }, lastT + 2400))
+
+    return () => timers.forEach(clearTimeout)
+  }, [selectedCaseId])
 
   function handleSelectCase(id: string) {
+    setInvPhase('idle')
+    setCompletedAgents([])
     setSelectedCaseId(null)
     requestAnimationFrame(() => setSelectedCaseId(id))
   }
@@ -1254,10 +1446,10 @@ export default function DarkPatterns() {
   return (
     <div className="flex h-full overflow-hidden">
       <CaseRegistry selectedId={selectedCaseId} onSelect={handleSelectCase} />
-      <CenterPanel key={selectedCaseId ?? 'empty'} caseId={selectedCaseId} />
+      <CenterPanel caseId={selectedCaseId} invPhase={invPhase} completedAgents={completedAgents} />
       <div className="w-[270px] shrink-0 border-l border-slate-200 bg-white overflow-hidden flex flex-col">
         {selectedCaseId
-          ? <AgentCasePanel key={selectedCaseId} caseId={selectedCaseId} />
+          ? <AgentCasePanel key={selectedCaseId} caseId={selectedCaseId} invPhase={invPhase} completedAgents={completedAgents} />
           : <AgentScanningPanel />
         }
       </div>

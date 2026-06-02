@@ -53,6 +53,18 @@ export interface ChecklistArtifact {
 
 export type Artifact = TableArtifact | MetricGridArtifact | IntelListArtifact | ChecklistArtifact
 
+export interface SarBrief {
+  type: string                  // e.g. 'SAR-HT', 'SAR-PB+MM'
+  filingDeadline: string        // ISO date
+  typology: string
+  fincenRef: string
+  indicators: string[]          // specific FinCEN indicators triggered
+  narrative: string             // full draft SAR narrative
+  recommendation: string
+  jointFiling?: string[]        // other case IDs for joint filing
+  victimReferral?: boolean
+}
+
 export interface AgentFinding {
   agentId: string
   caseId: string
@@ -61,6 +73,7 @@ export interface AgentFinding {
   confidence: number
   verdict: 'FLAGGED' | 'REVIEW' | 'PASS'
   artifacts?: Artifact[]
+  sarBrief?: SarBrief           // only on strategist findings
 }
 
 export const AGENTS: AgentDef[] = [
@@ -427,6 +440,23 @@ export const AGENT_FINDINGS: AgentFinding[] = [
         ],
       },
     ],
+    sarBrief: {
+      type: 'SAR-HT',
+      filingDeadline: '2026-05-25',
+      typology: 'Human Trafficking — Corridor Movement (I-95)',
+      fincenRef: 'FIN-2014-A008',
+      indicators: [
+        'Industry/MCC red flags: 85% of spend in hotel, ATM, rideshare, and prepaid reload categories (threshold > 70%)',
+        'Geographic movement: 6 cities in 18 days matching the documented I-95 corridor — Boston → Providence → NYC → Philadelphia → Baltimore → DC',
+        'Multi-issuer BIN clustering: 8–14 distinct issuer BINs confirmed at each of 5 hotel properties on same nights as subject cardholder',
+        'Hotel→ATM sequences: 6 confirmed within 4-hour city windows across 5 properties',
+        'Absent ordinary spend: zero dining, grocery, or retail transactions over 18 days — inconsistent with voluntary travel',
+      ],
+      narrative: 'The subject cardholder (CAP-004821) maintained a 76-month account history with normal consumer spend — grocery, dining, gas, retail — prior to the flagged period. Beginning April 7, 2026, the cardholder transacted exclusively in trafficking-adjacent merchant categories across 6 cities along the I-95 corridor over 18 days. Normal spend categories were entirely absent. Hotel-to-ATM sequences were detected 6 times across 5 distinct hotel properties. Cross-issuer analysis via the Discover network confirmed 8 to 14 additional distinct issuer BINs at each property on the same nights, indicating coordinated multi-card operation. Three cardholders in this case also appear in FRONT-002 (Sunrise Transport LLC), and a terminal IP subnet overlap further links the two cases. This pattern is consistent with human trafficking financial indicators 1, 3, and 5 in FinCEN Advisory FIN-2014-A008.',
+      recommendation: 'File joint SAR-HT with FRONT-002. Refer to National Human Trafficking Hotline. Flag merchant MID-0001102 for venue-level SAR investigation.',
+      jointFiling: ['FRONT-002'],
+      victimReferral: true,
+    },
   },
 
   // ── CORR-002 ──────────────────────────────────────────────────────────────────
@@ -590,6 +620,22 @@ export const AGENT_FINDINGS: AgentFinding[] = [
     ],
     finding: 'I-10 Southern corridor. New account fast-tracked into controlled movement. Venue-level SAR recommended for Beaumont property.',
     confidence: 87, verdict: 'FLAGGED',
+    sarBrief: {
+      type: 'SAR-HT',
+      filingDeadline: '2026-04-20',
+      typology: 'Human Trafficking — Corridor Movement (I-10 Southern) + New Account',
+      fincenRef: 'FIN-2014-A008',
+      indicators: [
+        'Industry/MCC red flags: 81% of spend in hotel, ATM, rideshare, and prepaid reload categories',
+        'Geographic movement: 5 cities in 10 days on the I-10 Southern corridor — Houston → Beaumont → New Orleans → Mobile → Jacksonville',
+        'New account corridor entry: account opened 34 days prior, immediately exhibiting full corridor pattern with no legitimate spend history',
+        'Venue nexus: MID-0001102 (Beaumont, TX) is the 3rd distinct cardholder group at this merchant in 45 days — venue-level investigation required',
+        'Hotel→ATM sequences: 5 confirmed within 4-hour city windows',
+      ],
+      narrative: 'The subject cardholder (CAP-007342) opened their Capital One account 34 days prior to Day 1 of this corridor run, with no prior transaction history. The account immediately entered a corridor pattern consistent with controlled movement along the I-10 Southern route over 10 days. Cash velocity reached 82% of total spend. The Beaumont, TX property (MID-0001102) where the subject transacted is confirmed as a repeat trafficking venue — this is the 3rd distinct cardholder group observed there in 45 days. New accounts with no spend seasoning entering full corridor patterns immediately are a documented indicator of purpose-opened accounts used by trafficking controllers. This pattern is consistent with geographic movement and MCC red flags in FinCEN Advisory FIN-2014-A008.',
+      recommendation: 'File SAR-HT. File separate venue-level SAR for MID-0001102 (Beaumont property). Flag account for 90-day monitoring.',
+      victimReferral: true,
+    },
     artifacts: [
       {
         type: 'table', title: 'Evidence Weight Decomposition — 87% Confidence',
@@ -670,6 +716,22 @@ export const AGENT_FINDINGS: AgentFinding[] = [
     ],
     finding: 'CRITICAL — 9-account controller network confirmed. One operator, 6 banks, $28,400. SAR-HT + Money Mule filing.',
     confidence: 97, verdict: 'FLAGGED',
+    sarBrief: {
+      type: 'SAR-HT + SAR-MM',
+      filingDeadline: '2026-04-15',
+      typology: 'Funnel Accounts / Controller Network — FIN-2020-A008 Typology 3',
+      fincenRef: 'FIN-2020-A008',
+      indicators: [
+        'Device fingerprint FP-7a3c9d2e1b4f8a0c shared across 4 Capital One accounts — p < 0.001%',
+        'Session IP 192.168.44.17 confirmed at both account login events and Discover merchant terminals (MID-0001872, MID-0002341)',
+        '$28,400 combined cash-out across 9 accounts at 6 institutions over 21 days',
+        'Cross-account structuring: each account $2,700–$4,100 — distributed to avoid per-account CTR threshold',
+        '6 distinct issuer BINs confirmed at 3 shared merchants within 90-minute windows over 7 nights',
+      ],
+      narrative: 'A single controller operating from IP 192.168.44.17 is confirmed to have operated 9 accounts across 6 financial institutions — 4 Capital One accounts (device fingerprint match) plus 5 additional accounts at Discover, Chase, Wells Fargo, US Bank, and Citibank (Discover network terminal cross-match). The controller accessed accounts between 10:45 PM and 12:15 AM across multiple nights. Combined cash-out is $28,400 over 21 days. Amounts were distributed across accounts to remain below $10,000 per account, avoiding Currency Transaction Report obligations. The session IP was also identified at the same Discover merchant terminals where multi-issuer BIN clustering was detected, definitively linking the controller to the physical operation. This typology matches FIN-2020-A008 Typology 3 (Funnel Accounts).',
+      recommendation: 'File joint SAR-HT + SAR-MM (Money Mule). Refer to FBI Financial Crimes Unit. Freeze controller accounts pending investigation.',
+      jointFiling: ['FRONT-001'],
+    },
   },
 
   // ── FRONT-001 ─────────────────────────────────────────────────────────────────
@@ -703,6 +765,22 @@ export const AGENT_FINDINGS: AgentFinding[] = [
     ],
     finding: 'Probable front operation. $750K credit exposure linked to same entity Discover flags as statistically impossible legitimate business.',
     confidence: 96, verdict: 'FLAGGED',
+    sarBrief: {
+      type: 'SAR-FE',
+      filingDeadline: '2026-05-10',
+      typology: 'Front Company — FIN-2020-A008 Typology 1',
+      fincenRef: 'FIN-2020-A008',
+      indicators: [
+        'Monthly processing volume $182K vs $28K MCC peer median (6.5× above peer) for declared day spa',
+        '84% of volume concentrated 10 PM–4 AM — 5.6× MCC 7297 peer night benchmark; zero daytime activity on 6 of 14 days',
+        '91% card-not-present rate for a declared in-person service business — physically impossible without fraud',
+        '0.00% chargeback rate over 14 months — customers never dispute, anomalously clean',
+        'Legal entity Sunrise Wellness Group LLC holds $750K commercial credit facility (COMM-00312) at Capital One',
+      ],
+      narrative: 'Sunrise Wellness Group LLC (MID-0003847), declared as a day spa in Las Vegas, NV, processed $182,000 in the review month — 6.5× the MCC 7297 city-adjusted peer median. Transaction volume was concentrated 84% after 10 PM, producing a 5.6× peer night ratio. The merchant had zero activity during its declared hours (9 AM–7 PM) on 6 of 14 days. The 91% card-not-present rate for a declared in-person business and 0.00% chargeback rate over 14 months are individually anomalous; in combination they are statistically inconsistent with legitimate business operations. The same legal entity holds a $750,000 commercial credit facility at Capital One, creating cross-product exposure. This pattern is consistent with a front company laundering proceeds as described in FIN-2020-A008 Typology 1.',
+      recommendation: 'File SAR-FE (Front Company). Freeze merchant processing. Escalate $750K commercial exposure to Credit Risk. Refer to FBI Las Vegas Field Office.',
+      jointFiling: ['CTRL-001'],
+    },
   },
 
   // ── FRONT-002 ─────────────────────────────────────────────────────────────────
@@ -735,6 +813,23 @@ export const AGENT_FINDINGS: AgentFinding[] = [
     ],
     finding: 'Controlled transport service linked to I-95 corridor trafficking network. Joint SAR-HT with CORR-001.',
     confidence: 88, verdict: 'FLAGGED',
+    sarBrief: {
+      type: 'SAR-HT',
+      filingDeadline: '2026-05-20',
+      typology: 'Front Company / Transport — FIN-2020-A008 Typology 1 + CORR-001 Cross-Link',
+      fincenRef: 'FIN-2020-A008',
+      indicators: [
+        '79% of $94K monthly volume concentrated 10 PM–5 AM — 4.4× MCC 4121 peer benchmark for declared car service',
+        '97% card-not-present rate — no physical terminal usage in 9 months for a declared rideshare service',
+        'Monthly volume $94K vs $31K peer median (3.0× above peer)',
+        '3 cardholders in this case also appear in active case CORR-001 (I-95 corridor); terminal IP subnet overlap confirmed',
+        'Cross-case cardholder and infrastructure link to active human trafficking corridor case',
+      ],
+      narrative: 'Sunrise Transport LLC (MID-0005123), declared as a car service in Philadelphia, PA, processed $94,000 in the review month. Volume was concentrated 79% after 10 PM, producing a 4.4× peer night ratio for MCC 4121. No physical terminal usage has been recorded in 9 months — 97% card-not-present for a declared in-person rideshare operation is inconsistent with legitimate business. Three cardholders appearing in this merchant\'s transaction data also appear in CORR-001, an active I-95 corridor human trafficking case. Terminal IP subnet overlap between this merchant and hotels in CORR-001 further confirms an operational link. The pattern is consistent with a transport front company facilitating victim movement along the I-95 corridor.',
+      recommendation: 'File joint SAR-HT with CORR-001. Refer to FBI VCATF. Freeze merchant processing pending investigation.',
+      jointFiling: ['CORR-001'],
+      victimReferral: true,
+    },
   },
 ]
 
