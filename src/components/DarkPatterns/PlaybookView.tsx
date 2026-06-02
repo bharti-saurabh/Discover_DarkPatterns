@@ -70,8 +70,7 @@ function AdvisoryDetail({ rule }: { rule: PlaybookRule }) {
   const [showImpl, setShowImpl] = useState(false)
   const [codeLang, setCodeLang] = useState<'primary' | 'alt'>('primary')
 
-  const activeLang = codeLang === 'primary' ? rule.script.language : rule.script.altLanguage
-  const activeCode = codeLang === 'primary' ? rule.script.code     : rule.script.altCode
+  const activeCode = codeLang === 'primary' ? rule.script.code : rule.script.altCode
 
   // Separate threshold step from observation steps
   const thresholdStep = rule.computationalSteps.find(s => s.toLowerCase().startsWith('flag when'))
