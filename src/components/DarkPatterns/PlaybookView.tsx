@@ -1,324 +1,324 @@
 import { useState } from 'react'
-import { PLAYBOOK_RULES, type PlaybookRule, type DataField } from '../../data/playbookData'
+import { PLAYBOOK_RULES, type PlaybookRule } from '../../data/playbookData'
 import { FINCEN_CATEGORIES } from '../../data/darkPatternsData'
 
-const SOURCE_BADGE: Record<DataField['source'], { badge: string; badgeText: string; label: string }> = {
-  capone:   { badge: 'bg-indigo-100', badgeText: 'text-indigo-600', label: 'Cap One' },
-  discover: { badge: 'bg-violet-100', badgeText: 'text-violet-600', label: 'Discover' },
-  both:     { badge: 'bg-slate-200',  badgeText: 'text-slate-500',  label: 'Both' },
-}
+// ── Left panel: rule list ─────────────────────────────────────────────────────────
 
-const FIELD_TYPE_ICONS: Record<DataField['type'], string> = {
-  transaction: 'T',
-  merchant:    'M',
-  device:      'D',
-  geographic:  'G',
-  temporal:    '⏱',
-}
-
-function FlowArrow({ label }: { label: string }) {
+function RuleList({ selectedId, onSelect }: { selectedId: string; onSelect: (id: string) => void }) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 border-t border-dashed border-slate-200" />
-      <div className="shrink-0 flex items-center gap-1.5 px-3 py-1 bg-slate-800 rounded-full">
-        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-        <span className="text-[8px] font-bold text-white uppercase tracking-wider">{label}</span>
-      </div>
-      <div className="flex-1 border-t border-dashed border-slate-200" />
-    </div>
-  )
-}
-
-function AlgorithmDiagram({ rule }: { rule: PlaybookRule }) {
-  const fieldsByType: Record<DataField['type'], DataField[]> = {
-    transaction: rule.dataFields.filter(f => f.type === 'transaction'),
-    merchant:    rule.dataFields.filter(f => f.type === 'merchant'),
-    device:      rule.dataFields.filter(f => f.type === 'device'),
-    geographic:  rule.dataFields.filter(f => f.type === 'geographic'),
-    temporal:    rule.dataFields.filter(f => f.type === 'temporal'),
-  }
-  const typeLabels: Record<DataField['type'], string> = {
-    transaction: 'Auth Transactions',
-    merchant:    'Merchant Data',
-    device:      'Device & Session',
-    geographic:  'Geographic',
-    temporal:    'Temporal',
-  }
-  const typeColors: Record<DataField['type'], string> = {
-    transaction: 'bg-indigo-50 border-indigo-100 text-indigo-700',
-    merchant:    'bg-violet-50 border-violet-100 text-violet-700',
-    device:      'bg-cyan-50 border-cyan-100 text-cyan-700',
-    geographic:  'bg-emerald-50 border-emerald-100 text-emerald-700',
-    temporal:    'bg-amber-50 border-amber-100 text-amber-700',
-  }
-  const activeTypes = (Object.keys(fieldsByType) as DataField['type'][]).filter(t => fieldsByType[t].length > 0)
-
-  return (
-    <div className="space-y-3">
-
-      {/* ① Input datasets */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Input Datasets</div>
-
-        {/* All tables as chips — no source grouping */}
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {rule.script.tables.map(t => (
-            <span key={t.name} className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border bg-white text-slate-600 border-slate-300">{t.name}</span>
-          ))}
-        </div>
-
-        {/* Fields grouped by data type, inline with tables */}
-        <div className="grid grid-cols-2 gap-2">
-          {activeTypes.map(type => (
-            <div key={type} className={`border rounded-lg p-2 ${typeColors[type]}`}>
-              <div className="text-[8px] font-bold uppercase tracking-wider opacity-70 mb-1.5">{typeLabels[type]}</div>
-              <div className="space-y-1">
-                {fieldsByType[type].map((f, i) => (
-                  <div key={i}>
-                    <div className="text-[9px] font-semibold leading-tight">{f.name}</div>
-                    <div className="text-[8px] opacity-60 leading-tight">{f.description}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+    <div className="flex flex-col gap-1.5 overflow-y-auto pr-1">
+      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-1 pb-1.5">
+        Detection Rules
       </div>
 
-      <FlowArrow label="Detection Flow" />
-
-      {/* ② Algorithm steps */}
-      <div className="bg-slate-900 rounded-xl p-3 space-y-2">
-        {rule.computationalSteps.map((step, i) => (
-          <div key={i} className="flex gap-2">
-            <span className="shrink-0 w-4 h-4 rounded bg-indigo-700 text-white text-[7px] font-bold flex items-center justify-center mt-0.5">
-              {i + 1}
-            </span>
-            <p className="text-[9px] text-slate-300 leading-relaxed font-mono">{step}</p>
-          </div>
-        ))}
-      </div>
-
-      <FlowArrow label="Classify" />
-
-      {/* ③ Classification output */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-2.5">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-            <div className="text-[8px] font-bold uppercase tracking-widest text-red-600">Flagged</div>
-          </div>
-          <p className="text-[9px] font-mono text-red-800 leading-snug">{rule.script.classification.flagged}</p>
-        </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-            <div className="text-[8px] font-bold uppercase tracking-widest text-amber-600">Review</div>
-          </div>
-          <p className="text-[9px] font-mono text-amber-800 leading-snug">{rule.script.classification.review}</p>
-        </div>
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            <div className="text-[8px] font-bold uppercase tracking-widest text-emerald-600">Pass</div>
-          </div>
-          <p className="text-[9px] font-mono text-emerald-800 leading-snug">{rule.script.classification.pass}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Toggle({
-  options,
-  active,
-  onSelect,
-}: {
-  options: { value: string; label: string; color?: string }[]
-  active: string
-  onSelect: (v: string) => void
-}) {
-  return (
-    <div className="flex rounded-lg border border-slate-200 overflow-hidden">
-      {options.map((opt, i) => {
-        const isActive = active === opt.value
-        const activeClass = opt.color ?? 'bg-slate-800'
+      {PLAYBOOK_RULES.map(rule => {
+        const cat = FINCEN_CATEGORIES[rule.categoryId]
+        const sel = selectedId === rule.categoryId
         return (
           <button
-            key={opt.value}
-            onClick={() => onSelect(opt.value)}
-            className={[
-              'px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide transition-colors',
-              i > 0 ? 'border-l border-slate-200' : '',
-              isActive ? `${activeClass} text-white` : 'bg-white text-slate-400 hover:text-slate-700',
-            ].join(' ')}
+            key={rule.categoryId}
+            onClick={() => onSelect(rule.categoryId)}
+            className={`w-full text-left rounded-xl border p-3 transition-all ${
+              sel
+                ? 'bg-indigo-50 border-indigo-200 shadow-sm'
+                : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
+            }`}
           >
-            {opt.label}
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded ${
+                sel ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+              }`}>{rule.ruleId}</span>
+              <span className={`text-[8px] font-mono font-semibold ${sel ? 'text-amber-600' : 'text-amber-500'}`}>
+                {rule.categoryId}
+              </span>
+              <span className={`ml-auto text-[8px] font-semibold px-1.5 py-0.5 rounded-full ${
+                sel ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'
+              }`}>{rule.triggeredCases.length} cases</span>
+            </div>
+            <div className={`text-[10px] font-semibold leading-snug ${sel ? 'text-indigo-900' : 'text-slate-700'}`}>
+              {cat.label}
+            </div>
+            <div className={`text-[9px] mt-0.5 ${sel ? 'text-indigo-400' : 'text-slate-400'}`}>
+              {rule.advisoryRef}
+            </div>
           </button>
         )
       })}
+
+      <div className="mt-2 pt-3 border-t border-slate-100 px-1 space-y-2">
+        <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">FinCEN Sources</div>
+        <a href="https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008" target="_blank" rel="noopener noreferrer"
+          className="block text-[9px] text-amber-600 hover:text-amber-500 leading-snug">
+          FIN-2014-A008 ↗
+        </a>
+        <a href="https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008" target="_blank" rel="noopener noreferrer"
+          className="block text-[9px] text-amber-600 hover:text-amber-500 leading-snug">
+          FIN-2020-A008 ↗
+        </a>
+        <p className="text-[8px] text-slate-400 leading-snug pt-1">
+          Synthetic data only — for demonstration purposes.
+        </p>
+      </div>
     </div>
   )
 }
 
-function RuleDetail({ rule }: { rule: PlaybookRule }) {
+// ── Advisory detail ───────────────────────────────────────────────────────────────
+
+function AdvisoryDetail({ rule }: { rule: PlaybookRule }) {
   const cat = FINCEN_CATEGORIES[rule.categoryId]
+  const [showImpl, setShowImpl] = useState(false)
   const [codeLang, setCodeLang] = useState<'primary' | 'alt'>('primary')
-  const [viewMode, setViewMode] = useState<'code' | 'diagram'>('code')
 
   const activeLang = codeLang === 'primary' ? rule.script.language : rule.script.altLanguage
   const activeCode = codeLang === 'primary' ? rule.script.code     : rule.script.altCode
 
-  const langColor = (lang: string) => lang === 'python' ? 'bg-emerald-600' : 'bg-blue-600'
+  // Separate threshold step from observation steps
+  const thresholdStep = rule.computationalSteps.find(s => s.toLowerCase().startsWith('flag when'))
+  const observationSteps = rule.computationalSteps.filter(s => !s.toLowerCase().startsWith('flag when'))
 
   return (
-    <div className="space-y-4 overflow-y-auto scrollbar-thin pr-1 h-full">
+    <div className="h-full overflow-y-auto space-y-4 pr-1">
 
-      {/* Header — advisory card */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold text-amber-700 font-mono bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
-                Rule {rule.ruleId}
-              </span>
-              <a
-                href={rule.advisoryUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] font-bold text-amber-600 hover:text-amber-500 underline underline-offset-2"
-              >
-                {rule.advisoryRef} ↗
-              </a>
-              <span className="text-[10px] text-amber-600">fincen.gov</span>
-            </div>
-            <div className="text-xs font-semibold text-amber-900 mb-1">{rule.advisoryTitle}</div>
-            <p className="text-[10px] text-amber-700 leading-relaxed">{rule.advisoryGuidance}</p>
+      {/* ── 1. Advisory Brief ── */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[9px] font-bold font-mono bg-amber-100 border border-amber-300 text-amber-700 px-2 py-0.5 rounded">
+              Rule {rule.ruleId}
+            </span>
+            <a href={rule.advisoryUrl} target="_blank" rel="noopener noreferrer"
+              className="text-[9px] font-bold text-amber-600 hover:text-amber-500 border border-amber-300 bg-white px-2 py-0.5 rounded">
+              {rule.advisoryRef} ↗
+            </a>
+            <span className="text-[9px] font-semibold text-amber-700">{cat.label}</span>
           </div>
-          <div className="shrink-0 text-right">
-            <div className="text-xs font-bold text-slate-700">{cat.label}</div>
+        </div>
+
+        <h2 className="text-sm font-bold text-amber-900 leading-snug mb-2">{rule.advisoryTitle}</h2>
+        <p className="text-[11px] text-amber-800 leading-relaxed">{rule.advisoryGuidance}</p>
+
+        <div className="mt-3 pt-3 border-t border-amber-200">
+          <div className="text-[9px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">Detection Objective</div>
+          <p className="text-[11px] text-amber-800 leading-relaxed">{rule.detectionObjective}</p>
+        </div>
+      </div>
+
+      {/* ── 2. What FinCEN Says to Look For ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5">
+        <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-3">
+          What FinCEN Identifies as Red Flags
+        </div>
+
+        <div className="space-y-3">
+          {observationSteps.map((step, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-[8px] font-bold text-red-600">{i + 1}</span>
+              </div>
+              <p className="text-[11px] text-slate-700 leading-relaxed">{step}</p>
+            </div>
+          ))}
+        </div>
+
+        {thresholdStep && (
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <p className="text-[10px] text-red-800 font-semibold leading-snug">{thresholdStep}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 3. Data & Detection Coverage ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5">
+        <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-3">
+          Detection Coverage — Cap One + Discover
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-start">
+          {/* Cap One alone */}
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3.5">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+              <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider">Capital One alone</span>
+            </div>
+            <p className="text-[10px] text-indigo-900 leading-snug mb-2">{rule.caponeAlone.capability}</p>
+            <div className="flex items-start gap-1.5 bg-white/60 border border-indigo-100 rounded-lg px-2.5 py-2">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <p className="text-[9px] text-indigo-600 leading-snug italic">{rule.caponeAlone.limitation}</p>
+            </div>
+          </div>
+
+          {/* Arrow */}
+          <div className="flex flex-col items-center justify-center pt-8 gap-1">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" className="rotate-180"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <span className="text-[7px] font-bold text-slate-400 uppercase tracking-wider mt-1">Combined</span>
+          </div>
+
+          {/* Discover alone */}
+          <div className="bg-violet-50 border border-violet-100 rounded-xl p-3.5">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-2 h-2 rounded-full bg-violet-500 shrink-0" />
+              <span className="text-[9px] font-bold text-violet-700 uppercase tracking-wider">Discover alone</span>
+            </div>
+            <p className="text-[10px] text-violet-900 leading-snug mb-2">{rule.discoverAlone.capability}</p>
+            <div className="flex items-start gap-1.5 bg-white/60 border border-violet-100 rounded-lg px-2.5 py-2">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <p className="text-[9px] text-violet-600 leading-snug italic">{rule.discoverAlone.limitation}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Combined unique insight */}
+        <div className="mt-3 bg-gradient-to-r from-indigo-50 via-white to-violet-50 border border-slate-200 rounded-xl p-3.5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="flex gap-0.5">
+              <div className="w-2 h-2 rounded-full bg-indigo-500" />
+              <div className="w-2 h-2 rounded-full bg-violet-500 -ml-0.5" />
+            </div>
+            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-wider">What the combination unlocks</span>
+          </div>
+          <p className="text-[10px] text-slate-700 leading-snug mb-2">{rule.combined.capability}</p>
+          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2">
+            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-1">Example from this demo</div>
+            <p className="text-[10px] text-slate-600 leading-snug italic">{rule.combined.uniqueInsight}</p>
           </div>
         </div>
       </div>
 
-      {/* Detection objective + algorithm */}
-      <div className="grid grid-cols-[1fr_1.3fr] gap-4">
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Detection Objective</div>
-          <p className="text-[11px] text-slate-700 leading-relaxed">{rule.detectionObjective}</p>
-          <div className="mt-3 pt-3 border-t border-slate-200">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Required Data Inputs</div>
-            <div className="space-y-1.5">
-              {rule.dataFields.map((field, i) => {
-                const src = SOURCE_BADGE[field.source]
-                return (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="shrink-0 w-4 h-4 rounded bg-slate-200 text-slate-500 text-[8px] font-bold flex items-center justify-center mt-0.5">
-                      {FIELD_TYPE_ICONS[field.type]}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-semibold text-slate-700 truncate">{field.name}</span>
-                        <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded ${src.badge} ${src.badgeText}`}>{src.label}</span>
-                      </div>
-                      <p className="text-[9px] text-slate-400 leading-snug">{field.description}</p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+      {/* ── 4. Cases triggered in this demo ── */}
+      {rule.evidence.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-3">
+            Cases in This Demo — {rule.triggeredCases.length} triggered
           </div>
-        </div>
-
-        <div className="bg-slate-900 rounded-xl p-4">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Detection Algorithm</div>
           <div className="space-y-2.5">
-            {rule.computationalSteps.map((step, i) => (
-              <div key={i} className="flex gap-2.5">
-                <span className="shrink-0 w-5 h-5 rounded bg-indigo-700 text-white text-[9px] font-bold flex items-center justify-center mt-0.5">
-                  {i + 1}
-                </span>
-                <p className="text-[10px] text-slate-300 leading-relaxed font-mono">{step}</p>
+            {rule.evidence.map(ev => (
+              <div key={ev.caseId} className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100">
+                  <span className="text-[9px] font-bold font-mono text-indigo-600">{ev.caseId}</span>
+                  <p className="text-[9px] text-slate-600 leading-snug flex-1">{ev.finding}</p>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5 px-3 py-2">
+                  {ev.metrics.map((m, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${m.triggered ? 'bg-red-500' : 'bg-slate-300'}`} />
+                      <span className="text-[9px] text-slate-500">{m.label}</span>
+                      <span className={`text-[9px] font-bold font-mono ${m.triggered ? 'text-red-600' : 'text-slate-400'}`}>{m.observed}</span>
+                      <span className="text-[8px] text-slate-400 font-mono">/ {m.threshold}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Detection implementation */}
-      <div className="space-y-2.5">
-        {/* Header row with both toggles */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Detection Implementation</div>
+      {/* ── 5. Detection implementation (on demand) ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setShowImpl(v => !v)}
+          className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors text-left"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+          </svg>
+          <span className="text-sm font-semibold text-slate-800 flex-1">View Detection Implementation</span>
+          <span className="text-[9px] text-slate-400">SQL · Python</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round"
+            className={`shrink-0 transition-transform duration-200 ${showImpl ? 'rotate-180' : ''}`}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
 
-          {/* Language toggle — only visible in code view */}
-          {viewMode === 'code' && (
-            <Toggle
-              active={codeLang}
-              onSelect={v => setCodeLang(v as 'primary' | 'alt')}
-              options={[
-                { value: 'primary', label: rule.script.language.toUpperCase(), color: langColor(rule.script.language) },
-                { value: 'alt',     label: rule.script.altLanguage.toUpperCase(), color: langColor(rule.script.altLanguage) },
-              ]}
-            />
-          )}
+        {showImpl && (
+          <div className="px-5 pb-5 border-t border-slate-100 space-y-4">
 
-          {/* View mode toggle — always visible */}
-          <div className="ml-auto">
-            <Toggle
-              active={viewMode}
-              onSelect={v => setViewMode(v as 'code' | 'diagram')}
-              options={[
-                { value: 'code',    label: 'Code' },
-                { value: 'diagram', label: 'Diagram' },
-              ]}
-            />
-          </div>
-        </div>
-
-        {viewMode === 'code' ? (
-          <>
-            {/* Table sources */}
-            <div className="flex flex-wrap gap-1.5">
-              {rule.script.tables.map(t => (
-                <span key={t.name} className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${
-                  t.source === 'capone'
-                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    : t.source === 'discover'
-                      ? 'bg-violet-50 text-violet-700 border-violet-200'
-                      : 'bg-slate-100 text-slate-500 border-slate-200'
-                }`}>{t.name}</span>
-              ))}
-              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${
-                activeLang === 'python' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
-              }`}>{activeLang}</span>
+            {/* Algorithm steps */}
+            <div className="pt-4">
+              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-3">Algorithm Steps</div>
+              <div className="space-y-2">
+                {rule.computationalSteps.map((step, i) => (
+                  <div key={i} className="flex gap-2.5">
+                    <span className="shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[8px] font-bold flex items-center justify-center mt-0.5">
+                      {i + 1}
+                    </span>
+                    <p className="text-[10px] text-slate-600 leading-relaxed">{step}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Code block */}
-            <pre className="bg-slate-950 rounded-xl p-4 overflow-x-auto overflow-y-auto max-h-80 scrollbar-thin">
-              <code className="text-[9px] text-slate-200 font-mono leading-relaxed whitespace-pre">
-                {activeCode}
-              </code>
-            </pre>
+            {/* Language toggle + table sources */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex-1">Query</div>
+                <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                  {(['primary', 'alt'] as const).map((k, i) => {
+                    const lang = k === 'primary' ? rule.script.language : rule.script.altLanguage
+                    const isActive = codeLang === k
+                    return (
+                      <button
+                        key={k}
+                        onClick={() => setCodeLang(k)}
+                        className={[
+                          'px-3 py-1 text-[9px] font-bold uppercase tracking-wide transition-colors',
+                          i > 0 ? 'border-l border-slate-200' : '',
+                          isActive
+                            ? lang === 'python' ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'
+                            : 'bg-white text-slate-400 hover:text-slate-700',
+                        ].join(' ')}
+                      >
+                        {lang}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
 
-            {/* Classification legend */}
+              {/* Table chips */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {rule.script.tables.map(t => (
+                  <span key={t.name} className={`text-[8px] font-mono font-bold px-2 py-0.5 rounded border ${
+                    t.source === 'capone'   ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                    t.source === 'discover' ? 'bg-violet-50 text-violet-700 border-violet-200' :
+                                              'bg-slate-100 text-slate-500 border-slate-200'
+                  }`}>{t.name}</span>
+                ))}
+              </div>
+
+              {/* Code block */}
+              <pre className="bg-slate-900 rounded-xl p-4 overflow-x-auto max-h-72 overflow-y-auto">
+                <code className="text-[9px] text-slate-200 font-mono leading-relaxed whitespace-pre">
+                  {activeCode}
+                </code>
+              </pre>
+            </div>
+
+            {/* Classification thresholds */}
             <div className="grid grid-cols-3 gap-2">
               {[
                 { label: 'FLAGGED', value: rule.script.classification.flagged, cls: 'bg-red-50 border-red-200 text-red-800' },
                 { label: 'REVIEW',  value: rule.script.classification.review,  cls: 'bg-amber-50 border-amber-200 text-amber-800' },
                 { label: 'PASS',    value: rule.script.classification.pass,    cls: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
               ].map(row => (
-                <div key={row.label} className={`border rounded-lg p-2.5 ${row.cls}`}>
+                <div key={row.label} className={`border rounded-xl p-3 ${row.cls}`}>
                   <div className="text-[8px] font-bold uppercase tracking-widest mb-1 opacity-60">{row.label}</div>
                   <p className="text-[9px] font-mono leading-snug">{row.value}</p>
                 </div>
               ))}
             </div>
-          </>
-        ) : (
-          <AlgorithmDiagram rule={rule} />
+          </div>
         )}
       </div>
 
@@ -326,79 +326,16 @@ function RuleDetail({ rule }: { rule: PlaybookRule }) {
   )
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────────
+
 export default function PlaybookView() {
   const [selectedId, setSelectedId] = useState(PLAYBOOK_RULES[0].categoryId)
   const selected = PLAYBOOK_RULES.find(r => r.categoryId === selectedId)!
 
   return (
-    <div className="grid grid-cols-[210px_1fr] gap-5 h-full min-h-0">
-      {/* Rule list */}
-      <div className="flex flex-col gap-1.5 overflow-y-auto scrollbar-thin pr-1">
-        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1">
-          FinCEN Advisory → Detection Rule
-        </div>
-        {PLAYBOOK_RULES.map(rule => {
-          const cat = FINCEN_CATEGORIES[rule.categoryId]
-          const isSelected = selectedId === rule.categoryId
-          return (
-            <button
-              key={rule.categoryId}
-              onClick={() => setSelectedId(rule.categoryId)}
-              className={`w-full text-left rounded-xl border p-3 transition-colors ${
-                isSelected ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[9px] font-bold font-mono text-slate-400">
-                  {rule.ruleId}
-                </span>
-                <span className={`font-mono text-[10px] font-bold ${isSelected ? 'text-amber-400' : 'text-amber-600'}`}>
-                  {rule.categoryId}
-                </span>
-                <span className={`ml-auto text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
-                  isSelected ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {rule.triggeredCases.length}
-                </span>
-              </div>
-              <div className={`text-[10px] font-semibold leading-tight ${isSelected ? 'text-white' : 'text-slate-700'}`}>
-                {cat.label}
-              </div>
-              <div className={`text-[9px] mt-0.5 ${isSelected ? 'text-slate-500' : 'text-slate-400'}`}>
-                {rule.advisoryRef}
-              </div>
-            </button>
-          )
-        })}
-
-        <div className="mt-2 pt-3 border-t border-slate-100 px-1 space-y-2">
-          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Advisory Sources</div>
-          <a
-            href="https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2014-a008"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block text-[9px] text-amber-600 hover:text-amber-500 underline underline-offset-1 leading-snug"
-          >
-            FIN-2014-A008 — Human Trafficking Financial Red Flags ↗
-          </a>
-          <a
-            href="https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block text-[9px] text-amber-600 hover:text-amber-500 underline underline-offset-1 leading-snug"
-          >
-            FIN-2020-A008 — Supplemental Trafficking Advisory ↗
-          </a>
-          <div className="text-[9px] text-slate-400 leading-snug pt-1">
-            Rules HT-1 through HT-6 derived from FinCEN advisory guidance. All case data is synthetic and for demonstration purposes.
-          </div>
-        </div>
-      </div>
-
-      {/* Rule detail */}
-      <div className="min-h-0 overflow-hidden">
-        <RuleDetail key={selected.categoryId} rule={selected} />
-      </div>
+    <div className="grid grid-cols-[200px_1fr] gap-5 h-full min-h-0">
+      <RuleList selectedId={selectedId} onSelect={id => setSelectedId(id)} />
+      <AdvisoryDetail key={selected.categoryId} rule={selected} />
     </div>
   )
 }
