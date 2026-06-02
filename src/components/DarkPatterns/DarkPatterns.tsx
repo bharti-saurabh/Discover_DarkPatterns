@@ -690,20 +690,6 @@ function FinCENPanel({ categories }: { categories: string[] }) {
   )
 }
 
-function StrategistVerdict({ f }: { f: AgentFinding }) {
-  return (
-    <div className="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <PulseDot color="bg-red-500" />
-        <span className="text-sm font-bold text-slate-900">Case Strategist Verdict</span>
-        <span className="ml-auto text-[9px] font-bold bg-red-600 text-white px-2 py-0.5 rounded-full">{f.verdict}</span>
-      </div>
-      <p className="text-[11px] text-slate-700 leading-relaxed mb-2.5">{f.finding}</p>
-      <ConfidenceBar value={f.confidence} />
-    </div>
-  )
-}
-
 // ── MCC spend breakdown (cardholder) ─────────────────────────────────────────────
 
 function MccBreakdown({ c }: { c: CorridorCase }) {
