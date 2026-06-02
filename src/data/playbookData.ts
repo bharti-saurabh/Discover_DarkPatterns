@@ -1095,4 +1095,396 @@ ORDER BY convergence_events DESC, ip_cross_match DESC;`,
       },
     },
   },
+
+  // ── Pig Butchering ────────────────────────────────────────────────────────────
+  {
+    categoryId: 'PB-Crypto',
+    ruleId: 'PB-1',
+    advisoryRef: 'FIN-2023-Alert001',
+    advisoryUrl: 'https://www.fincen.gov/sites/default/files/2023-09/FinCEN%20Alert%20FIN-2023-Alert001.pdf',
+    advisoryTitle: 'FinCEN Alert on Prevalent Virtual Currency Investment Scams ("Pig Butchering")',
+    advisoryGuidance:
+      'FIN-2023-Alert001 alerts financial institutions to a surge in virtual currency investment scams known as "pig butchering" (shā zhū pán). Fraudsters cultivate online relationships with victims over weeks or months — through dating apps, social media, or unsolicited messages — before convincing them to invest in fraudulent cryptocurrency platforms. The platforms fabricate returns to build confidence, then execute a sudden fund drain. FinCEN identifies escalating virtual currency deposits, pressure to invest larger amounts, use of unregistered exchanges, and credit-line exploitation as key financial red flags requiring SAR filing.',
+    detectionObjective:
+      'Detect the grooming-to-attack pattern: initial small crypto exchange test deposits escalating geometrically to large wire transfers, combined with sudden credit utilization spikes and destination exchange blacklist matches.',
+    computationalSteps: [
+      'Detect first-ever MCC 6051 (cryptocurrency exchange / money transfer) appearance on an account with no prior crypto transaction history — baseline disruption signal',
+      'Identify "test deposit" escalation: two or more crypto exchange deposits within 30 days where each subsequent deposit is ≥ 2× the prior amount (geometric growth pattern)',
+      'Flag wire transfer velocity anomaly: total wires to virtual currency exchanges exceeding $5,000 within 30 days on an account with zero prior wire history',
+      'Detect credit utilization spike: utilization increasing ≥ 50 percentage points within 30 days, especially when immediately followed by a wire to a crypto exchange (coerced extraction pattern)',
+      'Cross-reference destination exchange entity against FinCEN MSB registration database and known scam wallet cluster blacklist',
+      'Flag when: first MCC 6051 + escalation pattern, OR wire velocity > $5K with no wire history, OR destination matches blacklisted wallet cluster — any one of these alone warrants SAR consideration',
+    ],
+    dataFields: [
+      { name: 'MCC Code', type: 'transaction', source: 'both', description: 'MCC 6051 (crypto exchange / non-bank money transfer) as primary trigger signal' },
+      { name: 'Wire Transfer Records', type: 'transaction', source: 'capone', description: 'Outbound wire destination, amount, and timing for velocity analysis' },
+      { name: 'Credit Utilization History', type: 'transaction', source: 'capone', description: '30-day rolling utilization for spike detection' },
+      { name: 'MSB Registry', type: 'merchant', source: 'both', description: 'FinCEN Money Services Business registration lookup for destination exchange verification' },
+    ],
+    caponeAlone: { capability: 'Detect test deposit escalation and wire velocity on Cap One cardholders.', limitation: 'Cannot see cross-institution account patterns or shared wallet cluster signals.' },
+    discoverAlone: { capability: 'Detect merchant-level crypto exchange clustering.', limitation: 'Cannot link to cardholder identity or relationship grooming signals.' },
+    combined: { capability: 'Cross-victim wallet cluster identification — same exchange receiving funds from multiple institutions.', uniqueInsight: 'PB-001 and PB-002 both wired to wallet cluster 0x7f3a…c42d via different branded platforms (CryptoVault Pro and TrustFinance) — only detectable by cross-referencing both issuer streams against the same receiving wallet registry.' },
+    triggeredCases: ['PB-001', 'PB-002'],
+    evidence: [],
+    script: {
+      language: 'sql',
+      altLanguage: 'python',
+      tables: [
+        { name: 'capone.transactions', source: 'capone' },
+        { name: 'capone.account_utilization_daily', source: 'capone' },
+        { name: 'ref.msb_registry', source: 'combined' },
+      ],
+      code: `-- ① Detect first-ever MCC 6051 (crypto exchange) per account
+WITH first_crypto AS (
+  SELECT cardholder_id, MIN(txn_ts) AS first_crypto_ts,
+    COUNT(*) AS crypto_txn_count
+  FROM capone.transactions
+  WHERE mcc = '6051'
+    AND txn_ts >= NOW() - INTERVAL '90 days'
+  GROUP BY cardholder_id
+),
+-- ② Test deposit escalation: geometric growth across crypto deposits
+test_escalation AS (
+  SELECT cardholder_id,
+    COUNT(*) AS deposit_count,
+    MAX(amount) / NULLIF(MIN(amount), 0) AS growth_ratio
+  FROM capone.transactions
+  WHERE mcc = '6051'
+    AND txn_ts >= NOW() - INTERVAL '30 days'
+  GROUP BY cardholder_id
+),
+-- ③ Wire transfer velocity to crypto/money-transfer merchants
+wire_velocity AS (
+  SELECT cardholder_id,
+    SUM(amount) AS wire_total_30d,
+    COUNT(*) AS wire_count
+  FROM capone.transactions
+  WHERE mcc IN ('6051','4829')
+    AND txn_ts >= NOW() - INTERVAL '30 days'
+  GROUP BY cardholder_id
+),
+-- ④ Credit utilization spike (peak - floor in 30 days)
+util_spike AS (
+  SELECT cardholder_id,
+    MAX(utilization_pct) - MIN(utilization_pct) AS util_delta_pp
+  FROM capone.account_utilization_daily
+  WHERE snapshot_date >= NOW() - INTERVAL '30 days'
+  GROUP BY cardholder_id
+)
+SELECT fc.cardholder_id,
+  fc.first_crypto_ts, te.deposit_count,
+  te.growth_ratio, wv.wire_total_30d, us.util_delta_pp,
+  CASE
+    WHEN te.growth_ratio >= 2 AND wv.wire_total_30d >= 5000 THEN 'FLAGGED'
+    WHEN wv.wire_total_30d >= 5000 OR us.util_delta_pp >= 50  THEN 'FLAGGED'
+    WHEN te.deposit_count >= 2                                 THEN 'REVIEW'
+    ELSE 'PASS'
+  END AS pb1_status
+FROM first_crypto fc
+LEFT JOIN test_escalation te ON te.cardholder_id = fc.cardholder_id
+LEFT JOIN wire_velocity    wv ON wv.cardholder_id = fc.cardholder_id
+LEFT JOIN util_spike       us ON us.cardholder_id = fc.cardholder_id
+ORDER BY wv.wire_total_30d DESC NULLS LAST;`,
+      altCode: `import pandas as pd
+from sqlalchemy import create_engine
+engine = create_engine("postgresql+psycopg2://user:pass@host/db")
+
+# ① Load recent transactions
+txns = pd.read_sql(
+    "SELECT cardholder_id, mcc, amount, txn_ts "
+    "FROM capone.transactions "
+    "WHERE txn_ts >= NOW() - INTERVAL '30 days'",
+    engine, parse_dates=['txn_ts'])
+
+# ② First-ever crypto exchange deposit
+crypto = txns[txns.mcc == '6051']
+first_crypto = crypto.groupby('cardholder_id')['txn_ts'].min().reset_index()
+
+# ③ Test deposit escalation
+escalation = (crypto.sort_values('txn_ts')
+    .groupby('cardholder_id')['amount']
+    .apply(lambda a: a.max() / a.min() if len(a) > 1 else 0)
+    .rename('growth_ratio').reset_index())
+
+# ④ Wire velocity
+wire = txns[txns.mcc.isin(['6051','4829'])]
+wire_vel = wire.groupby('cardholder_id')['amount'].sum().rename('wire_total').reset_index()
+
+# ⑤ Classify
+result = first_crypto.merge(escalation, on='cardholder_id', how='left') \\
+                     .merge(wire_vel,   on='cardholder_id', how='left').fillna(0)
+result['pb1_status'] = result.apply(lambda r: (
+    'FLAGGED' if (r.growth_ratio >= 2 and r.wire_total >= 5000) or r.wire_total >= 5000
+    else 'REVIEW'  if r.growth_ratio >= 2
+    else 'PASS'), axis=1)
+print(result.sort_values('wire_total', ascending=False))`,
+      classification: {
+        flagged: 'test escalation (growth ≥ 2×) AND wire total ≥ $5K, OR wire total ≥ $5K with no wire history',
+        review:  '≥ 2 crypto deposits in 30 days without escalation threshold — monitor for progression',
+        pass:    'first MCC 6051 occurrence only — flag for 30-day watchlist',
+      },
+    },
+  },
+
+  // ── Elder Financial Exploitation ──────────────────────────────────────────────
+  {
+    categoryId: 'EFE-Exploit',
+    ruleId: 'EFE-1',
+    advisoryRef: 'FIN-2022-A002',
+    advisoryUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2022-a002',
+    advisoryTitle: 'FinCEN Advisory on Elder Financial Exploitation',
+    advisoryGuidance:
+      'FIN-2022-A002 addresses the growing threat of elder financial exploitation (EFE) — the illegal or improper use of an older adult\'s funds, property, or assets. EFE is perpetrated by family members, caregivers, fiduciaries, and romance scammers, and is one of the fastest-growing categories of financial crime with an estimated $28.3 billion in annual US losses. FinCEN identifies patterns including sudden large cash withdrawals, new authorized user additions correlated with fund transfers, wire transfers to previously unknown recipients, and geographic inconsistencies as key financial red flags. Victims often do not self-report due to shame, dependency, or cognitive decline, making proactive monitoring by financial institutions especially critical to victim protection.',
+    detectionObjective:
+      'Identify account holders aged 60 or older exhibiting sudden anomalous financial behavior — large cash withdrawal clusters, new authorized user additions, first-ever wires to unknown payees, or geographic transaction inconsistencies — that may indicate exploitation by a caregiver, family member, or scammer.',
+    computationalSteps: [
+      'Apply elder risk overlay: flag accounts held by cardholders aged 60 or older who exhibit spend pattern changes exceeding 2× their 90-day baseline in any single category (cash, wire, or new payee spend)',
+      'Detect large cash withdrawal clusters: three or more ATM withdrawals totaling > $3,000 within any 7-day window on an account with historically low cash activity (< 5% baseline cash ratio)',
+      'Monitor new authorized user or joint account holder additions: flag if a large withdrawal (> $2,000) or wire transfer occurs within 30 days of adding a new authorized user to an elder-flagged account',
+      'Detect first-ever wire transfer to a new payee from an account with no prior wire history, where the account holder is aged 60 or older — cross-check payee against known exploitation and romance scam registries',
+      'Flag geographic transaction inconsistency: transactions appearing in a city or state inconsistent with the cardholder\'s established location patterns — may indicate proxy access or travel under duress',
+      'Flag when: Elder overlay active AND any of: cash cluster > $3K in 7 days, OR new authorized user + large withdrawal, OR first-ever wire + age ≥ 60, OR geographic inconsistency with large transaction',
+    ],
+    dataFields: [
+      { name: 'Cardholder Age', type: 'transaction', source: 'capone', description: 'Account holder date of birth — primary input for elder risk overlay (age ≥ 60)' },
+      { name: 'Authorized User Changes', type: 'transaction', source: 'capone', description: 'New authorized user or POA additions — correlated with subsequent fund movement' },
+      { name: 'Wire Transfer Records', type: 'transaction', source: 'capone', description: 'Outbound wire payee, amount, and timing for first-ever wire detection' },
+      { name: 'Transaction Geography', type: 'geographic', source: 'both', description: 'City/state per transaction for location consistency monitoring' },
+    ],
+    caponeAlone: { capability: 'Detect cash clusters and wire anomalies on Cap One elder cardholders.', limitation: 'Cannot see cross-institution exploitation patterns or shared exploiter payee networks.' },
+    discoverAlone: { capability: 'Detect geographic inconsistencies at Discover-network merchants.', limitation: 'Cannot link to cardholder age or authorized user change events.' },
+    combined: { capability: 'Cross-institution payee matching to identify serial exploiters receiving funds from multiple elder victims across banks.', uniqueInsight: 'A single exploiter may receive funds from elder victims at multiple institutions — detectable only when Cap One wire payees are cross-referenced against Discover network payment recipients.' },
+    triggeredCases: [],
+    evidence: [],
+    script: {
+      language: 'sql',
+      altLanguage: 'python',
+      tables: [
+        { name: 'capone.transactions', source: 'capone' },
+        { name: 'capone.account_holders', source: 'capone' },
+        { name: 'capone.authorized_user_changes', source: 'capone' },
+      ],
+      code: `-- ① Elder cardholder overlay (age ≥ 60)
+WITH elder_accounts AS (
+  SELECT account_id, cardholder_id,
+    DATE_PART('year', AGE(date_of_birth)) AS age
+  FROM capone.account_holders
+  WHERE DATE_PART('year', AGE(date_of_birth)) >= 60
+),
+-- ② Unusual cash cluster: 3+ ATM txns > $3K total in any 7-day window
+cash_clusters AS (
+  SELECT t.cardholder_id,
+    SUM(t.amount) OVER (
+      PARTITION BY t.cardholder_id
+      ORDER BY t.txn_ts
+      RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW
+    ) AS rolling_7d_cash,
+    COUNT(*) OVER (
+      PARTITION BY t.cardholder_id
+      ORDER BY t.txn_ts
+      RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW
+    ) AS rolling_7d_count
+  FROM capone.transactions t
+  WHERE t.mcc = '6010'  -- ATM cash
+    AND t.txn_ts >= NOW() - INTERVAL '30 days'
+),
+-- ③ New authorized user within 30 days + subsequent large withdrawal
+auth_user_flag AS (
+  SELECT auc.account_id
+  FROM capone.authorized_user_changes auc
+  JOIN capone.transactions t
+    ON t.cardholder_id = auc.cardholder_id
+    AND t.txn_ts BETWEEN auc.change_ts AND auc.change_ts + INTERVAL '30 days'
+    AND t.amount >= 2000
+  WHERE auc.change_ts >= NOW() - INTERVAL '60 days'
+    AND auc.change_type = 'ADD'
+)
+SELECT ea.cardholder_id, ea.age,
+  MAX(cc.rolling_7d_cash)  AS peak_7d_cash,
+  MAX(cc.rolling_7d_count) AS peak_7d_count,
+  CASE WHEN auf.account_id IS NOT NULL THEN true ELSE false END AS auth_user_flag,
+  CASE
+    WHEN MAX(cc.rolling_7d_cash) > 3000 AND MAX(cc.rolling_7d_count) >= 3 THEN 'FLAGGED'
+    WHEN auf.account_id IS NOT NULL                                          THEN 'FLAGGED'
+    WHEN MAX(cc.rolling_7d_cash) > 1500                                      THEN 'REVIEW'
+    ELSE 'PASS'
+  END AS efe1_status
+FROM elder_accounts ea
+LEFT JOIN cash_clusters  cc  ON cc.cardholder_id = ea.cardholder_id
+LEFT JOIN auth_user_flag auf ON auf.account_id   = ea.account_id
+GROUP BY ea.cardholder_id, ea.age, auf.account_id
+ORDER BY peak_7d_cash DESC NULLS LAST;`,
+      altCode: `import pandas as pd
+from sqlalchemy import create_engine
+from datetime import timedelta
+engine = create_engine("postgresql+psycopg2://user:pass@host/db")
+
+# ① Load elder accounts (age >= 60)
+holders = pd.read_sql(
+    "SELECT cardholder_id, date_of_birth FROM capone.account_holders",
+    engine, parse_dates=['date_of_birth'])
+holders['age'] = (pd.Timestamp.today() - holders.date_of_birth).dt.days // 365
+elders = holders[holders.age >= 60].cardholder_id.tolist()
+
+# ② Load recent ATM transactions for elder accounts
+atm = pd.read_sql(
+    f"SELECT cardholder_id, amount, txn_ts FROM capone.transactions "
+    f"WHERE mcc='6010' AND txn_ts >= NOW()-INTERVAL '30 days' "
+    f"AND cardholder_id = ANY(ARRAY{elders})",
+    engine, parse_dates=['txn_ts'])
+
+# ③ Rolling 7-day cash cluster detection
+def rolling_cash(g):
+    g = g.sort_values('txn_ts')
+    g['roll7_sum'] = g.amount.rolling('7D', on='txn_ts').sum()
+    g['roll7_cnt'] = g.amount.rolling('7D', on='txn_ts').count()
+    return g
+atm_rolling = atm.groupby('cardholder_id', group_keys=False).apply(rolling_cash)
+peak = atm_rolling.groupby('cardholder_id').agg(
+    peak_cash=('roll7_sum','max'), peak_count=('roll7_cnt','max')).reset_index()
+
+# ④ Classify
+peak['efe1_status'] = peak.apply(lambda r: (
+    'FLAGGED' if r.peak_cash > 3000 and r.peak_count >= 3
+    else 'REVIEW'  if r.peak_cash > 1500
+    else 'PASS'), axis=1)
+print(peak.sort_values('peak_cash', ascending=False))`,
+      classification: {
+        flagged: '≥ 3 ATM withdrawals totaling > $3K in 7 days, OR new authorized user + large withdrawal within 30 days',
+        review:  'rolling 7-day ATM cash $1,500–$3,000 on elder account — monitor and cross-check with service records',
+        pass:    'elder overlay active but no anomalous cash or authorization patterns detected',
+      },
+    },
+  },
+
+  // ── Deepfake / GenAI Identity Fraud ──────────────────────────────────────────
+  {
+    categoryId: 'DF-Identity',
+    ruleId: 'DF-1',
+    advisoryRef: 'FIN-2024-NTC-2',
+    advisoryUrl: 'https://www.fincen.gov/resources/advisories',
+    advisoryTitle: 'FinCEN Notice on Deepfake and Generative AI-Enabled Identity Fraud',
+    advisoryGuidance:
+      'Financial institutions face a rapidly evolving threat from generative AI-enabled identity fraud. Fraudsters use deepfake video and audio to bypass biometric KYC checks, AI-assembled synthetic identity documents to open fraudulent accounts at scale, and cloned voice profiles to defeat IVR and call-center authentication. These attacks are increasingly automated — enabling account farm operations across multiple institutions simultaneously. FinCEN has directed institutions to assess their biometric verification confidence thresholds, monitor for synthetic identity indicators at account opening, flag device-change-to-wire sequences, and file SARs when AI-enabled fraud is suspected even without definitive proof of deepfake use.',
+    detectionObjective:
+      'Identify accounts opened with low-confidence biometric verification, synthetic identity indicators, or rapid account-open-to-transfer velocity — and detect device fingerprint clustering across institutions that may indicate coordinated AI-driven account farm activity.',
+    computationalSteps: [
+      'Flag low biometric confidence score at account opening: liveness detection confidence below the institution\'s threshold (typically < 85%), consistent with a deepfake video or photo injection during KYC — request secondary authentication',
+      'Detect device change followed by large wire: new device enrollment or device fingerprint change on an existing account, followed by an outbound wire exceeding $5,000 within 72 hours — classic account takeover amplified by AI social engineering',
+      'Identify synthetic identity indicators at account opening: SSN issued date inconsistent with stated cardholder age, no continuous credit file history prior to 12 months ago, or identity data matching known synthetic identity construction patterns',
+      'Monitor account-open-to-large-transfer velocity: accounts less than 30 days old receiving inbound deposits and immediately forwarding outbound transfers — consistent with mule accounts opened at scale using synthetic IDs',
+      'Cross-institution device cluster detection: same device fingerprint or originating IP address used to open or access accounts at multiple institutions within a 7-day window — hallmark of AI-automated account farm behavior',
+      'Flag when: Low biometric confidence at opening, OR device change + wire > $5K within 72hrs, OR synthetic identity score above threshold, OR account-open-to-transfer velocity anomaly detected within 30 days',
+    ],
+    dataFields: [
+      { name: 'Biometric Confidence Score', type: 'transaction', source: 'capone', description: 'Liveness detection confidence from biometric vendor at account opening — primary deepfake indicator' },
+      { name: 'Device Fingerprint', type: 'device', source: 'both', description: 'Device hardware and browser fingerprint — enables cross-institution account farm detection' },
+      { name: 'Account Open Date', type: 'temporal', source: 'capone', description: 'Account vintage for account-open-to-transfer velocity monitoring' },
+      { name: 'SSN Issue Date', type: 'transaction', source: 'capone', description: 'Social Security Number issue date vs stated cardholder age — synthetic identity consistency check' },
+    ],
+    caponeAlone: { capability: 'Detect biometric anomalies, device changes, and synthetic identity signals within Cap One accounts.', limitation: 'Cannot see cross-institution device clustering or account farm patterns across multiple banks.' },
+    discoverAlone: { capability: 'Detect device fingerprint clustering at Discover-network merchants and terminals.', limitation: 'Cannot link to account opening biometric scores or SSN consistency checks.' },
+    combined: { capability: 'Cross-institution device fingerprint matching to identify AI-automated account farm operators opening accounts at multiple banks simultaneously.', uniqueInsight: 'An AI account farm may open accounts at Cap One, Discover, and 4 other institutions within 7 days using the same device — only detectable when both device fingerprint registries are cross-referenced in real time.' },
+    triggeredCases: [],
+    evidence: [],
+    script: {
+      language: 'sql',
+      altLanguage: 'python',
+      tables: [
+        { name: 'capone.account_opening_events', source: 'capone' },
+        { name: 'capone.device_sessions', source: 'capone' },
+        { name: 'capone.transactions', source: 'capone' },
+      ],
+      code: `-- ① Low biometric confidence at account opening
+WITH biometric_flags AS (
+  SELECT account_id, cardholder_id, open_ts,
+    biometric_confidence_score,
+    biometric_confidence_score < 0.85 AS low_confidence
+  FROM capone.account_opening_events
+  WHERE open_ts >= NOW() - INTERVAL '90 days'
+),
+-- ② Device change → large wire within 72 hours
+device_wire AS (
+  SELECT ds.cardholder_id, ds.device_change_ts,
+    t.amount AS wire_amount, t.txn_ts AS wire_ts,
+    EXTRACT(EPOCH FROM (t.txn_ts - ds.device_change_ts))/3600 AS hours_to_wire
+  FROM capone.device_sessions ds
+  JOIN capone.transactions t
+    ON t.cardholder_id = ds.cardholder_id
+    AND t.mcc IN ('4829','6051')
+    AND t.txn_ts BETWEEN ds.device_change_ts
+                     AND ds.device_change_ts + INTERVAL '72 hours'
+    AND t.amount >= 5000
+  WHERE ds.device_change_ts >= NOW() - INTERVAL '30 days'
+    AND ds.is_new_device = true
+),
+-- ③ Account-open-to-transfer velocity (< 30 days old)
+new_acct_transfers AS (
+  SELECT t.cardholder_id,
+    SUM(t.amount) AS outbound_total_30d
+  FROM capone.transactions t
+  JOIN capone.account_opening_events ao ON ao.cardholder_id = t.cardholder_id
+  WHERE t.mcc IN ('4829','6051')
+    AND t.txn_ts <= ao.open_ts + INTERVAL '30 days'
+    AND ao.open_ts >= NOW() - INTERVAL '60 days'
+  GROUP BY t.cardholder_id
+)
+SELECT bf.cardholder_id, bf.biometric_confidence_score,
+  bf.low_confidence,
+  dw.wire_amount, dw.hours_to_wire,
+  nat.outbound_total_30d,
+  CASE
+    WHEN bf.low_confidence AND dw.wire_amount IS NOT NULL THEN 'FLAGGED'
+    WHEN bf.low_confidence OR nat.outbound_total_30d >= 5000 THEN 'FLAGGED'
+    WHEN dw.wire_amount IS NOT NULL                           THEN 'REVIEW'
+    ELSE 'PASS'
+  END AS df1_status
+FROM biometric_flags bf
+LEFT JOIN device_wire       dw  ON dw.cardholder_id = bf.cardholder_id
+LEFT JOIN new_acct_transfers nat ON nat.cardholder_id = bf.cardholder_id
+ORDER BY bf.biometric_confidence_score ASC;`,
+      altCode: `import pandas as pd
+from sqlalchemy import create_engine
+engine = create_engine("postgresql+psycopg2://user:pass@host/db")
+
+# ① Account opening biometric scores
+openings = pd.read_sql(
+    "SELECT account_id, cardholder_id, open_ts, biometric_confidence_score "
+    "FROM capone.account_opening_events "
+    "WHERE open_ts >= NOW() - INTERVAL '90 days'",
+    engine, parse_dates=['open_ts'])
+openings['low_confidence'] = openings.biometric_confidence_score < 0.85
+
+# ② Device change → wire within 72 hours
+device_sessions = pd.read_sql(
+    "SELECT cardholder_id, device_change_ts "
+    "FROM capone.device_sessions "
+    "WHERE is_new_device = true "
+    "AND device_change_ts >= NOW() - INTERVAL '30 days'",
+    engine, parse_dates=['device_change_ts'])
+wires = pd.read_sql(
+    "SELECT cardholder_id, amount, txn_ts "
+    "FROM capone.transactions "
+    "WHERE mcc IN ('4829','6051') AND amount >= 5000 "
+    "AND txn_ts >= NOW() - INTERVAL '30 days'",
+    engine, parse_dates=['txn_ts'])
+device_wire = device_sessions.merge(wires, on='cardholder_id')
+device_wire = device_wire[
+    (device_wire.txn_ts - device_wire.device_change_ts).dt.total_seconds() <= 72*3600]
+
+# ③ Classify
+result = openings.copy()
+result['device_wire_flag'] = result.cardholder_id.isin(device_wire.cardholder_id)
+result['df1_status'] = result.apply(lambda r: (
+    'FLAGGED' if r.low_confidence or r.device_wire_flag
+    else 'REVIEW'  if r.biometric_confidence_score < 0.92
+    else 'PASS'), axis=1)
+print(result.sort_values('biometric_confidence_score'))`,
+      classification: {
+        flagged: 'low biometric confidence (< 85%) at opening, OR device change + wire > $5K within 72hrs, OR new account outbound > $5K within 30 days',
+        review:  'biometric confidence 85–92% — secondary verification recommended before high-value transactions enabled',
+        pass:    'biometric confidence ≥ 92% and no device anomaly or velocity flag',
+      },
+    },
+  },
 ]

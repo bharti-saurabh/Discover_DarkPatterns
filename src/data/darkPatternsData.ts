@@ -52,6 +52,27 @@ export const FINCEN_CATEGORIES: Record<string, FinCENCategory> = {
     source: 'FIN-2020-A008, Typology 3',
     sourceUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2020-a008',
   },
+  'PB-Crypto': {
+    id: 'PB-Crypto',
+    label: 'Pig Butchering / Crypto Investment Scams',
+    description: 'Virtual currency investment scams using manufactured online relationships to coerce victims into fraudulent cryptocurrency platforms — escalating from test deposits to large wire transfers.',
+    source: 'FIN-2023-Alert001',
+    sourceUrl: 'https://www.fincen.gov/sites/default/files/2023-09/FinCEN%20Alert%20FIN-2023-Alert001.pdf',
+  },
+  'EFE-Exploit': {
+    id: 'EFE-Exploit',
+    label: 'Elder Financial Exploitation',
+    description: 'Illegal or improper use of an older adult\'s funds, property, or assets by caregivers, family members, fiduciaries, or romance scammers — often unreported due to shame or dependency.',
+    source: 'FIN-2022-A002',
+    sourceUrl: 'https://www.fincen.gov/resources/advisories/fincen-advisory-fin-2022-a002',
+  },
+  'DF-Identity': {
+    id: 'DF-Identity',
+    label: 'Deepfake / GenAI Identity Fraud',
+    description: 'AI-synthesized attacks using deepfake video/audio and synthetic identity documents to bypass biometric KYC, defeat voice authentication, and operate automated account farms across institutions.',
+    source: 'FIN-2024-NTC-2',
+    sourceUrl: 'https://www.fincen.gov/resources/advisories',
+  },
 }
 
 // ── MCC Reference ─────────────────────────────────────────────────────────────

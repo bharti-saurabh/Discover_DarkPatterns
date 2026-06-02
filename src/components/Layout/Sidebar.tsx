@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useApiConfig } from '../../hooks/useApiConfig'
+import straiveLogo from '../../assets/straive-logo.webp'
 
 export type Section = 'fincen-rulebook' | 'dark-patterns' | 'pig-butchering' | 'efe' | 'deepfake-fraud' | 'fraud-intelligence' | 'data-hub'
 
@@ -212,25 +213,16 @@ export default function Sidebar({ active, onNavigate }: Props) {
       {showConfig && <LLMConfigModal onClose={() => setShowConfig(false)} />}
 
       {/* Logo + collapse toggle */}
-      <div className={`border-b border-slate-200 flex items-center ${collapsed ? 'px-3 py-4 justify-center' : 'px-4 py-4 gap-2.5'}`}>
+      <div className={`border-b border-slate-200 flex items-center ${collapsed ? 'px-3 py-3.5 justify-center flex-col gap-2' : 'px-4 py-3.5 gap-2.5'}`}>
         {!collapsed && (
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="w-7 h-7 shrink-0 rounded bg-indigo-600 flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <div className="text-[11px] font-bold text-slate-900 leading-tight">Payment Integrity</div>
-              <div className="text-[10px] text-slate-400">Platform</div>
-            </div>
+          <div className="flex flex-col flex-1 min-w-0">
+            <img src={straiveLogo} alt="Straive" className="h-5 w-auto object-contain object-left" />
+            <div className="text-[9px] text-slate-400 mt-1 leading-tight tracking-wide">Payment Integrity Platform</div>
           </div>
         )}
         {collapsed && (
-          <div className="w-7 h-7 rounded bg-indigo-600 flex items-center justify-center">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
+          <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center">
+            <span className="text-white font-black text-[13px] leading-none">S</span>
           </div>
         )}
         <button
