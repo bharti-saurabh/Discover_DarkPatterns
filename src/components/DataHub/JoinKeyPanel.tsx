@@ -121,7 +121,7 @@ export default function JoinKeyPanel({ onHighlight, activeJoinKey, onJoinKeySele
 
               {/* Field path */}
               <div className={`flex items-center gap-1.5 font-mono text-[10px] mb-2 ${isActive ? 'text-slate-300' : 'text-slate-500'}`}>
-                <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded truncate max-w-[35%]">
+                <span className="bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded truncate max-w-[35%]">
                   {key.leftTable.replace('cap_','').replace('disc_','')}
                   <span className="opacity-60">.</span>
                   {key.leftField}

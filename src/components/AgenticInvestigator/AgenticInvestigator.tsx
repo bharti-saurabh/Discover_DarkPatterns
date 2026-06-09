@@ -129,7 +129,7 @@ function ApiConfigPanel({ current, onSave }: { current: ApiConfig; onSave: (c: A
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
               placeholder="sk-ant-api03-… or your proxy JWT token"
-              className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+              className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <div>
@@ -141,7 +141,7 @@ function ApiConfigPanel({ current, onSave }: { current: ApiConfig; onSave: (c: A
               value={baseUrl}
               onChange={e => setBaseUrl(e.target.value)}
               placeholder="https://llmfoundry.straive.com/anthropic"
-              className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+              className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <div>
@@ -149,7 +149,7 @@ function ApiConfigPanel({ current, onSave }: { current: ApiConfig; onSave: (c: A
             <select
               value={model}
               onChange={e => setModel(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
             </select>
@@ -160,7 +160,7 @@ function ApiConfigPanel({ current, onSave }: { current: ApiConfig; onSave: (c: A
               onClick={handleSave}
               disabled={!canSave}
               className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors shrink-0 ml-4 ${
-                canSave ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                canSave ? 'bg-blue-800 text-white hover:bg-blue-900' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
               }`}
             >
               Save
@@ -218,12 +218,12 @@ function CaseBriefView({ c, onLaunch, hasKey, apiConfig, onSaveConfig }: {
 
       {/* Data source columns */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="border border-indigo-200 rounded-xl overflow-hidden">
-          <div className="bg-indigo-600 px-4 py-2 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-indigo-200" />
+        <div className="border border-blue-200 rounded-xl overflow-hidden">
+          <div className="bg-blue-800 px-4 py-2 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-200" />
             <span className="text-xs font-bold text-white">Capital One — Issuer Data</span>
           </div>
-          <pre className="p-4 text-[10px] text-indigo-900 leading-relaxed font-mono bg-indigo-50 whitespace-pre-wrap overflow-x-auto">
+          <pre className="p-4 text-[10px] text-blue-950 leading-relaxed font-mono bg-blue-50 whitespace-pre-wrap overflow-x-auto">
             {c.caponeContext}
           </pre>
         </div>
@@ -257,7 +257,7 @@ function CaseBriefView({ c, onLaunch, hasKey, apiConfig, onSaveConfig }: {
         disabled={!hasKey}
         className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
           hasKey
-            ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 hover:shadow-indigo-300'
+            ? 'bg-blue-800 hover:bg-blue-900 text-white shadow-lg shadow-blue-200 hover:shadow-blue-300'
             : 'bg-slate-100 text-slate-400 cursor-not-allowed'
         }`}
       >
@@ -601,7 +601,7 @@ export default function AgenticInvestigator() {
               {stratDone && (
                 <button
                   onClick={() => { resetAll(); launchInvestigation() }}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-800 text-white hover:bg-blue-900 transition-colors"
                 >
                   Re-run
                 </button>

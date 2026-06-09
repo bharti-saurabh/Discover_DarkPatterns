@@ -6,19 +6,19 @@ import PlaybookView from './components/DarkPatterns/PlaybookView'
 import PlaybookViewInfographic from './components/DarkPatterns/PlaybookViewInfographic'
 import PigButchering from './components/PigButchering/PigButchering'
 import TeaserPanel from './components/TeaserPanel/TeaserPanel'
-import straiveLogo from './assets/straive-logo.webp'
+import caponeLogo from './assets/capone-logo.webp'
 
 type AdvisoryView = 'infographic' | 'detail'
 
 function TopBar() {
   return (
-    <div className="h-14 bg-white border-b border-slate-200 flex items-center px-6 shrink-0 shadow-sm z-30">
+    <div className="h-14 bg-white border-b border-slate-200 flex items-center px-6 shrink-0 z-30" style={{ borderTop: '3px solid #D3212C' }}>
       <div className="flex items-center gap-4">
-        <img src={straiveLogo} alt="Straive" className="h-8 w-auto object-contain" />
+        <img src={caponeLogo} alt="Capital One" className="h-8 w-auto object-contain" />
         <div className="h-6 w-px bg-slate-200" />
         <div className="flex flex-col">
-          <span className="text-sm font-bold text-slate-800 leading-tight">Payment Integrity Platform</span>
-          <span className="text-[10px] text-slate-400 leading-tight">Capital One · Discover Network · FinCEN Advisory</span>
+          <span className="text-sm font-bold text-slate-800 leading-tight">Financial Crime Intelligence</span>
+          <span className="text-[10px] text-slate-400 leading-tight">FinCEN Advisory · Capital One Network · Payment Integrity</span>
         </div>
       </div>
       <div className="ml-auto flex items-center gap-4 text-[10px] text-slate-400">
@@ -62,7 +62,7 @@ export default function App() {
                           'px-3 py-1.5 text-[10px] font-semibold transition-colors',
                           i > 0 ? 'border-l border-slate-200' : '',
                           advisoryView === opt.id
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-blue-800 text-white'
                             : 'text-slate-500 hover:text-slate-800',
                         ].join(' ')}>
                         {opt.label}

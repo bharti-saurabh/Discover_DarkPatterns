@@ -102,7 +102,7 @@ function CityTimeline({ corridorCase }: { corridorCase: CorridorCase }) {
                   </div>
                   {/* Source indicator dots */}
                   <div className="absolute -top-0.5 -right-0.5 flex gap-0.5">
-                    {hasCapOne && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 border border-white" />}
+                    {hasCapOne && <div className="w-1.5 h-1.5 rounded-full bg-blue-600 border border-white" />}
                     {hasDiscover && <div className="w-1.5 h-1.5 rounded-full bg-violet-500 border border-white" />}
                   </div>
                   {/* Tooltip */}
@@ -115,7 +115,7 @@ function CityTimeline({ corridorCase }: { corridorCase: CorridorCase }) {
                       </div>
                     ))}
                     <div className="flex gap-1 mt-1 pt-1 border-t border-slate-700">
-                      {stop.transactions.some(t => t.source === 'capone') && <span className="text-[9px] text-indigo-300">● Cap One</span>}
+                      {stop.transactions.some(t => t.source === 'capone') && <span className="text-[9px] text-blue-300">● Cap One</span>}
                       {stop.transactions.some(t => t.source === 'discover') && <span className="text-[9px] text-violet-300">● Discover</span>}
                     </div>
                   </div>
@@ -139,7 +139,7 @@ function CityTimeline({ corridorCase }: { corridorCase: CorridorCase }) {
             </span>
           ))}
           <span className="flex items-center gap-1 text-[10px] text-slate-400 ml-2">
-            <span className="w-2 h-2 rounded-full bg-indigo-500" /> Cap One signal
+            <span className="w-2 h-2 rounded-full bg-blue-600" /> Cap One signal
           </span>
           <span className="flex items-center gap-1 text-[10px] text-slate-400">
             <span className="w-2 h-2 rounded-full bg-violet-500" /> Discover signal
@@ -168,12 +168,12 @@ function CaseDetail({ c }: { c: CorridorCase }) {
 
       {/* Signal split */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-indigo-500" />
-            <span className="text-xs font-semibold text-indigo-700">Capital One sees</span>
+            <div className="w-2 h-2 rounded-full bg-blue-600" />
+            <span className="text-xs font-semibold text-blue-900">Capital One sees</span>
           </div>
-          <p className="text-[11px] text-indigo-800 leading-relaxed">{c.capOneSignal}</p>
+          <p className="text-[11px] text-blue-900 leading-relaxed">{c.capOneSignal}</p>
         </div>
         <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">

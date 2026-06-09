@@ -170,7 +170,7 @@ function ArtifactMetricGrid({ artifact }: { artifact: MetricGridArtifact }) {
             <div className="text-[8px] text-slate-500 font-medium mb-1 leading-tight">{m.label}</div>
             <div className={`text-sm font-bold leading-none ${m.flagged ? 'text-red-700' : 'text-slate-900'}`}>{m.value}</div>
             {m.peer && <div className="text-[8px] text-slate-400 mt-1 leading-tight">{m.peer}</div>}
-            {m.delta && <div className={`text-[8px] font-semibold mt-0.5 leading-tight ${m.flagged ? 'text-red-600' : 'text-indigo-600'}`}>{m.delta}</div>}
+            {m.delta && <div className={`text-[8px] font-semibold mt-0.5 leading-tight ${m.flagged ? 'text-red-600' : 'text-blue-800'}`}>{m.delta}</div>}
           </div>
         ))}
       </div>
@@ -187,7 +187,7 @@ function ArtifactIntelList({ artifact }: { artifact: IntelListArtifact }) {
       <div className="p-3 space-y-2">
         {artifact.items.map((item, i) => (
           <div key={i} className={`flex items-start gap-2.5 p-2.5 rounded-lg ${item.flagged ? 'bg-red-50 border border-red-100' : 'bg-slate-50'}`}>
-            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${item.flagged ? 'bg-red-500' : 'bg-indigo-400'}`} />
+            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${item.flagged ? 'bg-red-500' : 'bg-blue-500'}`} />
             <div className="min-w-0">
               <div className={`text-[10px] font-medium leading-snug ${item.flagged ? 'text-red-800' : 'text-slate-700'}`}>{item.text}</div>
               {item.detail && <div className="text-[9px] text-slate-500 mt-0.5 leading-snug">{item.detail}</div>}
@@ -333,7 +333,7 @@ function HourChart({ data, nightPct }: { data: FrontBusinessCase['hourlyVolume']
         </BarChart>
       </ResponsiveContainer>
       <div className="flex gap-4 mt-1">
-        <span className="flex items-center gap-1 text-[9px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-indigo-500 inline-block" /> This merchant</span>
+        <span className="flex items-center gap-1 text-[9px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-blue-600 inline-block" /> This merchant</span>
         <span className="flex items-center gap-1 text-[9px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> After 10 PM</span>
         <span className="flex items-center gap-1 text-[9px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-slate-200 inline-block" /> Peer avg</span>
       </div>
@@ -359,8 +359,8 @@ function ClusterNode({ data }: { data: { ip: string; fp: string } }) {
 function AccountNode({ data }: { data: { id: string; name: string; institution: string; cashOut: number; signals: string[]; daysOld: number } }) {
   const isCapOne = data.institution === 'capone'
   const isExternal = data.institution === 'external'
-  const border = isCapOne ? 'border-indigo-300' : isExternal ? 'border-slate-300' : 'border-violet-300'
-  const header = isCapOne ? 'bg-indigo-600' : isExternal ? 'bg-slate-500' : 'bg-violet-600'
+  const border = isCapOne ? 'border-blue-300' : isExternal ? 'border-slate-300' : 'border-violet-300'
+  const header = isCapOne ? 'bg-blue-800' : isExternal ? 'bg-slate-500' : 'bg-violet-600'
   const label = isCapOne ? 'Capital One' : isExternal ? 'Other Issuer' : 'Discover'
   return (
     <div className={`bg-white rounded-lg border-2 ${border} shadow-sm min-w-[160px]`}>
@@ -468,11 +468,11 @@ function InvestigationPipeline({ caseId, invPhase, completedAgents }: {
         <Fragment key={i}>
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-semibold transition-all ${
             s.done   ? 'bg-emerald-100 text-emerald-700' :
-            s.active ? 'bg-indigo-100 text-indigo-700' :
+            s.active ? 'bg-blue-100 text-blue-900' :
                        'bg-slate-100 text-slate-400'
           }`}>
             {s.done   && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
-            {s.active && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse inline-block" />}
+            {s.active && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse inline-block" />}
             {!s.done && !s.active && <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />}
             {s.label}
           </div>
@@ -487,6 +487,261 @@ function InvestigationPipeline({ caseId, invPhase, completedAgents }: {
         </span>
       )}
     </div>
+  )
+}
+
+// ── Live Investigation Theater — step-by-step chain-of-thought reveal ───────────
+
+function InvestigationLiveView({ caseId, invPhase, completedAgents, revealedAgentSteps }: {
+  caseId: string
+  invPhase: InvPhase
+  completedAgents: string[]
+  revealedAgentSteps: Record<string, number>
+}) {
+  const allFindings  = findingsForCase(caseId)
+  const nonStrat     = allFindings.filter(f => f.agentId !== 'strategist')
+  const stratF       = allFindings.find(f => f.agentId === 'strategist')
+  const [modal, setModal] = useState<string | null>(null)
+  const modalFinding = modal ? allFindings.find(f => f.agentId === modal) ?? null : null
+  const modalAgent   = modal ? AGENTS.find(a => a.id === modal) ?? null : null
+  const doneCount    = completedAgents.filter(id => id !== 'strategist').length
+  const stratDone    = completedAgents.includes('strategist')
+
+  if (invPhase === 'idle' || invPhase === 'complete') return null
+
+  const statusMsg: Record<InvPhase, string> = {
+    idle: '', detecting: 'Scanning 47,823 accounts…', dispatching: `Dispatching ${nonStrat.length} agents…`,
+    investigating: `${doneCount} of ${nonStrat.length} complete`, synthesizing: 'Strategist synthesizing…', complete: '',
+  }
+
+  return (
+    <>
+      {modalFinding && modalAgent && (
+        <AgentDetailModal agent={modalAgent} finding={modalFinding} onClose={() => setModal(null)} />
+      )}
+
+      <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700/80 shadow-xl">
+
+        {/* Header bar */}
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-700/50 bg-slate-800/50">
+          <PulseDot color="bg-blue-500" />
+          <span className="text-[10px] font-black text-white uppercase tracking-widest">Live Investigation</span>
+          <span className="font-mono text-[9px] text-slate-500 ml-0.5">{caseId}</span>
+          <span className="ml-auto text-[9px] text-blue-300">{statusMsg[invPhase]}</span>
+        </div>
+
+        {/* Detecting / dispatching warm-up */}
+        {['detecting', 'dispatching'].includes(invPhase) && (
+          <div className="p-5 flex items-center gap-4">
+            <div className="flex gap-1 items-end shrink-0">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="w-1.5 bg-blue-800 rounded-full animate-pulse"
+                  style={{ height: `${10 + i * 6}px`, animationDelay: `${i * 0.14}s` }} />
+              ))}
+            </div>
+            <div>
+              <div className="text-sm font-bold text-white">
+                {invPhase === 'detecting' ? 'Rule engine scanning…' : 'Dispatching investigators…'}
+              </div>
+              <div className="text-[9px] text-slate-400 mt-0.5">
+                {invPhase === 'detecting'
+                  ? 'Evaluating FinCEN advisory indicators across full transaction history'
+                  : `${nonStrat.length} specialist agents dispatched to investigate ${caseId}`}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step-by-step investigation log */}
+        {['investigating', 'synthesizing'].includes(invPhase) && (
+          <div className="p-3 space-y-2">
+
+            {nonStrat.map(f => {
+              const agent      = AGENTS.find(a => a.id === f.agentId)!
+              const revealed   = revealedAgentSteps[f.agentId] ?? -1
+              const complete   = completedAgents.includes(f.agentId)
+              const active     = revealed >= 0 && !complete
+              const isFlagged  = f.verdict === 'FLAGGED'
+
+              /* Queued — not yet dispatched */
+              if (revealed === -1) {
+                return (
+                  <div key={f.agentId} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/30">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-700 shrink-0" />
+                    <span className="text-[8px] font-mono text-slate-600 shrink-0">{agent.htRule}</span>
+                    <span className="text-[9px] text-slate-600 flex-1 truncate">{agent.name}</span>
+                    <span className="text-[8px] text-slate-700 italic">Queued</span>
+                  </div>
+                )
+              }
+
+              /* Active or complete — show full step log */
+              return (
+                <div key={f.agentId} className={`rounded-xl border transition-all duration-500 overflow-hidden ${
+                  complete
+                    ? isFlagged ? 'border-red-700/60 bg-red-950/30' : 'border-amber-700/50 bg-amber-950/20'
+                    : 'border-blue-900/40 bg-slate-800/60'
+                }`}>
+
+                  {/* Agent header */}
+                  <div className={`flex items-center gap-2.5 px-3.5 py-2.5 border-b ${
+                    complete
+                      ? isFlagged ? 'border-red-800/40' : 'border-amber-800/30'
+                      : 'border-slate-700/40'
+                  }`}>
+                    {complete
+                      ? <div className={`w-2 h-2 rounded-full shrink-0 ${isFlagged ? 'bg-red-400' : 'bg-amber-400'}`} />
+                      : <PulseDot color="bg-blue-500" />}
+                    <span className="text-[8px] font-mono font-bold text-blue-500 shrink-0">{agent.htRule}</span>
+                    <span className="text-[10px] font-bold text-slate-100 flex-1 truncate">{agent.name}</span>
+                    {complete && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-xs font-black font-mono tabular-nums ${isFlagged ? 'text-red-400' : 'text-amber-400'}`}>
+                          {f.confidence}%
+                        </span>
+                        <VerdictChip verdict={f.verdict} />
+                      </div>
+                    )}
+                    {active && <span className="text-[8px] text-blue-300 italic shrink-0 animate-pulse">Analyzing…</span>}
+                  </div>
+
+                  {/* Steps stream in one by one */}
+                  <div className="px-3.5 py-2.5 space-y-1.5">
+                    {f.steps.slice(0, revealed).map((step, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                          step.triggered ? 'bg-red-500/70' : 'bg-emerald-600/60'
+                        }`}>
+                          {step.triggered
+                            ? <svg width="5" height="5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                            : <svg width="5" height="5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className={`text-[9px] leading-snug ${step.triggered ? 'text-red-300 font-medium' : 'text-slate-400'}`}>
+                            {step.text}
+                          </span>
+                          {step.metric && (
+                            <span className={`ml-1.5 inline-block text-[8px] font-bold font-mono px-1 py-px rounded ${
+                              step.triggered ? 'bg-red-800/50 text-red-300' : 'bg-slate-700 text-slate-400'
+                            }`}>{step.metric}</span>
+                          )}
+                          {step.threshold && (
+                            <span className="ml-1 text-[8px] text-slate-600 font-mono">/ {step.threshold}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* In-progress pulse after last revealed step */}
+                    {active && revealed < f.steps.length && (
+                      <div className="flex items-center gap-2 pl-5">
+                        <div className="flex gap-0.5 items-center">
+                          {[0, 1, 2].map(i => (
+                            <div key={i} className="w-0.5 bg-blue-600 rounded-full animate-pulse"
+                              style={{ height: `${5 + i * 3}px`, animationDelay: `${i * 0.2}s` }} />
+                          ))}
+                        </div>
+                        <span className="text-[8px] text-blue-500/70 italic">Running check…</span>
+                      </div>
+                    )}
+
+                    {/* Finding + drill-down once complete */}
+                    {complete && (
+                      <div className={`mt-1.5 pt-2 border-t ${isFlagged ? 'border-red-800/40' : 'border-amber-800/30'}`}>
+                        <p className={`text-[9px] leading-snug ${isFlagged ? 'text-red-200/80' : 'text-amber-200/70'}`}>
+                          {f.finding}
+                        </p>
+                        <button onClick={() => setModal(f.agentId)}
+                          className="mt-1.5 text-[8px] font-semibold text-blue-500 hover:text-blue-300 transition-colors">
+                          Full analysis + evidence →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Strategist — appears during synthesizing, steps also stream in */}
+            {invPhase === 'synthesizing' && stratF && (() => {
+              const revealed = revealedAgentSteps['strategist'] ?? -1
+              return (
+                <div className={`rounded-xl border transition-all duration-500 overflow-hidden ${
+                  stratDone ? 'border-red-600/60 bg-red-950/30' : 'border-amber-700/40 bg-slate-800/60'
+                }`}>
+                  <div className={`flex items-center gap-2.5 px-3.5 py-2.5 border-b ${
+                    stratDone ? 'border-red-800/40' : 'border-slate-700/40'
+                  }`}>
+                    {stratDone
+                      ? <div className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                      : <PulseDot color="bg-amber-400" />}
+                    <span className="text-[10px] font-bold text-slate-100 flex-1">Case Strategist</span>
+                    {stratDone && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-black font-mono text-red-400">{stratF.confidence}%</span>
+                        <VerdictChip verdict={stratF.verdict} />
+                      </div>
+                    )}
+                    {!stratDone && revealed >= 0 && (
+                      <span className="text-[8px] text-amber-300 italic shrink-0 animate-pulse">Synthesizing…</span>
+                    )}
+                  </div>
+
+                  {revealed >= 0 && (
+                    <div className="px-3.5 py-2.5 space-y-1.5">
+                      {stratF.steps.slice(0, revealed).map((step, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                            step.triggered ? 'bg-red-500/70' : 'bg-emerald-600/60'
+                          }`}>
+                            {step.triggered
+                              ? <svg width="5" height="5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                              : <svg width="5" height="5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className={`text-[9px] leading-snug ${step.triggered ? 'text-red-300 font-medium' : 'text-slate-400'}`}>
+                              {step.text}
+                            </span>
+                            {step.metric && (
+                              <span className={`ml-1.5 inline-block text-[8px] font-bold font-mono px-1 py-px rounded ${
+                                step.triggered ? 'bg-red-800/50 text-red-300' : 'bg-slate-700 text-slate-400'
+                              }`}>{step.metric}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {!stratDone && revealed < stratF.steps.length && (
+                        <div className="flex items-center gap-2 pl-5">
+                          <div className="flex gap-0.5 items-center">
+                            {[0, 1, 2].map(i => (
+                              <div key={i} className="w-0.5 bg-amber-500 rounded-full animate-pulse"
+                                style={{ height: `${5 + i * 3}px`, animationDelay: `${i * 0.2}s` }} />
+                            ))}
+                          </div>
+                          <span className="text-[8px] text-amber-400/70 italic">Evaluating…</span>
+                        </div>
+                      )}
+
+                      {stratDone && stratF.sarBrief && (
+                        <div className="mt-1.5 pt-2 border-t border-red-800/40">
+                          <div className="text-[9px] text-red-200 font-semibold">
+                            SAR brief drafted — {stratF.sarBrief.type} filing recommended
+                          </div>
+                          <div className="text-[8px] text-slate-500 mt-0.5">
+                            Filing deadline: {stratF.sarBrief.filingDeadline}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -531,7 +786,7 @@ function SarBriefCard({ brief }: { brief: SarBrief }) {
       <div className="px-5 py-4 border-b border-red-100">
         <div className="flex items-center justify-between mb-2">
           <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">SAR Narrative — Draft</div>
-          <button onClick={() => setExpanded(e => !e)} className="text-[9px] text-indigo-600 hover:text-indigo-800 font-semibold">
+          <button onClick={() => setExpanded(e => !e)} className="text-[9px] text-blue-800 hover:text-blue-900 font-semibold">
             {expanded ? 'Collapse' : 'Read full'}
           </button>
         </div>
@@ -602,7 +857,7 @@ function AgentSignalGrid({ findings, revealedIds }: { findings: AgentFinding[]; 
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="text-[8px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{agent.htRule}</span>
+                      <span className="text-[8px] font-bold font-mono text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded">{agent.htRule}</span>
                       <VerdictChip verdict={f.verdict} />
                     </div>
                     <div className="text-xs font-bold text-slate-900 leading-tight">{agent.name}</div>
@@ -736,10 +991,10 @@ function AccountContextBanner({ c }: { c: CorridorCase }) {
   const isNewAccount = ctx.cardAge.includes('day')
 
   return (
-    <div className={`rounded-xl p-4 border ${isNewAccount ? 'bg-red-50 border-red-200' : 'bg-indigo-50 border-indigo-100'}`}>
+    <div className={`rounded-xl p-4 border ${isNewAccount ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-100'}`}>
       <div className="flex items-center gap-2 mb-3">
-        <span className={`text-[9px] font-bold uppercase tracking-wider ${isNewAccount ? 'text-red-600' : 'text-indigo-600'}`}>Account Profile</span>
-        <span className={`font-mono text-[9px] ${isNewAccount ? 'text-red-400' : 'text-indigo-400'}`}>{c.cardholderIdA}</span>
+        <span className={`text-[9px] font-bold uppercase tracking-wider ${isNewAccount ? 'text-red-600' : 'text-blue-800'}`}>Account Profile</span>
+        <span className={`font-mono text-[9px] ${isNewAccount ? 'text-red-400' : 'text-blue-500'}`}>{c.cardholderIdA}</span>
         {isNewAccount && <span className="ml-auto text-[8px] font-bold bg-red-200 text-red-700 px-2 py-0.5 rounded-full">⚠ New Account</span>}
       </div>
       <div className="grid grid-cols-3 gap-2 mb-3">
@@ -762,7 +1017,7 @@ function AccountContextBanner({ c }: { c: CorridorCase }) {
           <span className="text-[8px] text-slate-500 font-medium shrink-0">Typical spend:</span>
           <div className="flex flex-wrap gap-1">
             {ctx.typicalMccs.map(m => (
-              <span key={m} className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">{m}</span>
+              <span key={m} className="text-[8px] bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded font-medium">{m}</span>
             ))}
           </div>
         </div>
@@ -771,7 +1026,7 @@ function AccountContextBanner({ c }: { c: CorridorCase }) {
         <div className="flex-1">
           <div className="text-[8px] text-slate-400 font-medium mb-1.5">Baseline Cash Activity</div>
           <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-0.5">
-            <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${Math.min(ctx.baselineCashPct * 100, 100)}%` }} />
+            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(ctx.baselineCashPct * 100, 100)}%` }} />
           </div>
           <div className="text-[8px] text-slate-500">{ctx.baselineCashPct > 0 ? `${(ctx.baselineCashPct * 100).toFixed(0)}% of typical spend` : 'No baseline — new account'}</div>
         </div>
@@ -795,9 +1050,9 @@ function AccountContextBanner({ c }: { c: CorridorCase }) {
 
 // ── Cardholder detail ─────────────────────────────────────────────────────────────
 
-function CardholderDetail({ c, findings, strategist, invPhase, completedAgents }: {
+function CardholderDetail({ c, findings, strategist, invPhase, completedAgents, revealedAgentSteps }: {
   c: CorridorCase; findings: AgentFinding[]; strategist?: AgentFinding
-  invPhase: InvPhase; completedAgents: string[]
+  invPhase: InvPhase; completedAgents: string[]; revealedAgentSteps: Record<string, number>
 }) {
   return (
     <div className="space-y-4">
@@ -807,7 +1062,7 @@ function CardholderDetail({ c, findings, strategist, invPhase, completedAgents }
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded uppercase tracking-wider">Cardholder · Corridor</span>
+              <span className="text-[9px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">Cardholder · Corridor</span>
               <span className="font-mono text-[9px] text-slate-500">{c.id}</span>
             </div>
             <div className="text-lg font-bold text-slate-900">{c.corridorLabel} Corridor</div>
@@ -831,6 +1086,8 @@ function CardholderDetail({ c, findings, strategist, invPhase, completedAgents }
         </div>
       </div>
 
+      <InvestigationLiveView caseId={c.id} invPhase={invPhase} completedAgents={completedAgents} revealedAgentSteps={revealedAgentSteps} />
+
       <AccountContextBanner c={c} />
 
       <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -846,7 +1103,7 @@ function CardholderDetail({ c, findings, strategist, invPhase, completedAgents }
         <MccBreakdown c={c} />
       </div>
 
-      <AgentSignalGrid findings={findings} revealedIds={invPhase === 'idle' ? undefined : completedAgents.filter(id => id !== 'strategist')} />
+      {invPhase === 'complete' && <AgentSignalGrid findings={findings} />}
       <FinCENPanel categories={c.flaggedCategories} />
       {invPhase === 'complete' && strategist?.sarBrief && <SarBriefCard brief={strategist.sarBrief} />}
     </div>
@@ -855,15 +1112,16 @@ function CardholderDetail({ c, findings, strategist, invPhase, completedAgents }
 
 // ── Merchant detail ───────────────────────────────────────────────────────────────
 
-function MerchantDetail({ c, findings, strategist, invPhase, completedAgents }: {
+function MerchantDetail({ c, findings, strategist, invPhase, completedAgents, revealedAgentSteps }: {
   c: FrontBusinessCase; findings: AgentFinding[]; strategist?: AgentFinding
-  invPhase: InvPhase; completedAgents: string[]
+  invPhase: InvPhase; completedAgents: string[]; revealedAgentSteps: Record<string, number>
 }) {
   const volMultiplier = c.peerMonthlyVolume > 0 ? `${(c.monthlyVolume / c.peerMonthlyVolume).toFixed(1)}×` : undefined
   const cnpMultiplier = `${(c.cnpPct * 100).toFixed(0)}% vs 30%`
   return (
     <div className="space-y-4">
       <InvestigationPipeline caseId={c.id} invPhase={invPhase} completedAgents={completedAgents} />
+      <InvestigationLiveView caseId={c.id} invPhase={invPhase} completedAgents={completedAgents} revealedAgentSteps={revealedAgentSteps} />
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-start justify-between">
           <div>
@@ -897,7 +1155,7 @@ function MerchantDetail({ c, findings, strategist, invPhase, completedAgents }: 
         <HourChart data={c.hourlyVolume} nightPct={c.nightPct} />
       </div>
 
-      <AgentSignalGrid findings={findings} revealedIds={invPhase === 'idle' ? undefined : completedAgents.filter(id => id !== 'strategist')} />
+      {invPhase === 'complete' && <AgentSignalGrid findings={findings} />}
       <FinCENPanel categories={c.flaggedCategories} />
       {invPhase === 'complete' && strategist?.sarBrief && <SarBriefCard brief={strategist.sarBrief} />}
     </div>
@@ -906,14 +1164,15 @@ function MerchantDetail({ c, findings, strategist, invPhase, completedAgents }: 
 
 // ── Cluster detail ────────────────────────────────────────────────────────────────
 
-function ClusterDetail({ c, findings, strategist, invPhase, completedAgents }: {
+function ClusterDetail({ c, findings, strategist, invPhase, completedAgents, revealedAgentSteps }: {
   c: ControllerCase; findings: AgentFinding[]; strategist?: AgentFinding
-  invPhase: InvPhase; completedAgents: string[]
+  invPhase: InvPhase; completedAgents: string[]; revealedAgentSteps: Record<string, number>
 }) {
   const { nodes, edges } = useMemo(() => buildClusterGraph(c), [c])
   return (
     <div className="space-y-4">
       <InvestigationPipeline caseId={c.id} invPhase={invPhase} completedAgents={completedAgents} />
+      <InvestigationLiveView caseId={c.id} invPhase={invPhase} completedAgents={completedAgents} revealedAgentSteps={revealedAgentSteps} />
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-start justify-between">
           <div>
@@ -951,7 +1210,7 @@ function ClusterDetail({ c, findings, strategist, invPhase, completedAgents }: {
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50">
           <span className="text-xs font-bold text-slate-700">Account Network Graph</span>
           <div className="flex gap-3 text-[9px]">
-            <span className="flex items-center gap-1 text-slate-400"><span className="inline-block w-3 h-0.5 bg-indigo-500 mr-0.5" /> Capital One</span>
+            <span className="flex items-center gap-1 text-slate-400"><span className="inline-block w-3 h-0.5 bg-blue-600 mr-0.5" /> Capital One</span>
             <span className="flex items-center gap-1 text-slate-400"><span className="inline-block w-3 h-0.5 bg-violet-500 mr-0.5" /> Discover</span>
             <span className="flex items-center gap-1 text-slate-400"><span className="inline-block w-3 h-0.5 bg-slate-400 mr-0.5" /> Other</span>
           </div>
@@ -984,7 +1243,7 @@ function ClusterDetail({ c, findings, strategist, invPhase, completedAgents }: {
         </div>
       )}
 
-      <AgentSignalGrid findings={findings} revealedIds={invPhase === 'idle' ? undefined : completedAgents.filter(id => id !== 'strategist')} />
+      {invPhase === 'complete' && <AgentSignalGrid findings={findings} />}
       <FinCENPanel categories={c.flaggedCategories} />
       {invPhase === 'complete' && strategist?.sarBrief && <SarBriefCard brief={strategist.sarBrief} />}
     </div>
@@ -993,8 +1252,8 @@ function ClusterDetail({ c, findings, strategist, invPhase, completedAgents }: {
 
 // ── Center panel dispatcher ───────────────────────────────────────────────────────
 
-function CenterPanel({ caseId, invPhase, completedAgents }: {
-  caseId: string | null; invPhase: InvPhase; completedAgents: string[]
+function CenterPanel({ caseId, invPhase, completedAgents, revealedAgentSteps }: {
+  caseId: string | null; invPhase: InvPhase; completedAgents: string[]; revealedAgentSteps: Record<string, number>
 }) {
   if (!caseId) {
     return (
@@ -1014,7 +1273,7 @@ function CenterPanel({ caseId, invPhase, completedAgents }: {
         </div>
         <div className="grid grid-cols-3 gap-3 mt-6 w-full max-w-xs">
           {[
-            { label: 'Cardholders', count: CORRIDOR_CASES.length, cls: 'bg-indigo-100 text-indigo-700' },
+            { label: 'Cardholders', count: CORRIDOR_CASES.length, cls: 'bg-blue-100 text-blue-900' },
             { label: 'Merchants', count: FRONT_BUSINESS_CASES.length, cls: 'bg-violet-100 text-violet-700' },
             { label: 'Clusters', count: CONTROLLER_CASES.length, cls: 'bg-red-100 text-red-700' },
           ].map(s => (
@@ -1036,15 +1295,15 @@ function CenterPanel({ caseId, invPhase, completedAgents }: {
     <div className="flex-1 min-w-0 overflow-y-auto bg-slate-50 px-4 py-4">
       {entry.entityType === 'cardholder' && (() => {
         const c = CORRIDOR_CASES.find(x => x.id === caseId)!
-        return <CardholderDetail c={c} findings={findings} strategist={strategist} invPhase={invPhase} completedAgents={completedAgents} />
+        return <CardholderDetail c={c} findings={findings} strategist={strategist} invPhase={invPhase} completedAgents={completedAgents} revealedAgentSteps={revealedAgentSteps} />
       })()}
       {entry.entityType === 'merchant' && (() => {
         const c = FRONT_BUSINESS_CASES.find(x => x.id === caseId)!
-        return <MerchantDetail c={c} findings={findings} strategist={strategist} invPhase={invPhase} completedAgents={completedAgents} />
+        return <MerchantDetail c={c} findings={findings} strategist={strategist} invPhase={invPhase} completedAgents={completedAgents} revealedAgentSteps={revealedAgentSteps} />
       })()}
       {entry.entityType === 'cluster' && (() => {
         const c = CONTROLLER_CASES.find(x => x.id === caseId)!
-        return <ClusterDetail c={c} findings={findings} strategist={strategist} invPhase={invPhase} completedAgents={completedAgents} />
+        return <ClusterDetail c={c} findings={findings} strategist={strategist} invPhase={invPhase} completedAgents={completedAgents} revealedAgentSteps={revealedAgentSteps} />
       })()}
     </div>
   )
@@ -1088,23 +1347,23 @@ function CaseRegistry({ selectedId, onSelect }: { selectedId: string | null; onS
                   const sel = selectedId === c.id
                   return (
                     <button key={c.id} onClick={() => onSelect(c.id)}
-                      className={`w-full text-left rounded-lg p-2.5 transition-all border ${sel ? 'bg-indigo-600 border-indigo-500 shadow-md' : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}>
+                      className={`w-full text-left rounded-lg p-2.5 transition-all border ${sel ? 'bg-blue-800 border-blue-600 shadow-md' : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}>
                       <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className={`font-mono text-[9px] font-bold ${sel ? 'text-indigo-200' : 'text-slate-500'}`}>{c.id}</span>
+                        <span className={`font-mono text-[9px] font-bold ${sel ? 'text-blue-200' : 'text-slate-500'}`}>{c.id}</span>
                         <RiskBadge score={c.riskScore} />
                       </div>
                       <div className={`text-[10px] font-semibold leading-tight mb-1 ${sel ? 'text-white' : 'text-slate-800'}`}>{c.label}</div>
-                      <div className={`text-[9px] ${sel ? 'text-indigo-200' : 'text-slate-500'}`}>{c.sub}</div>
+                      <div className={`text-[9px] ${sel ? 'text-blue-200' : 'text-slate-500'}`}>{c.sub}</div>
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full ${sel ? 'bg-white/20 text-white' : 'bg-red-50 text-red-600'}`}>
                           {c.agentHits} flagged
                         </span>
                         <div className="flex gap-0.5 flex-wrap">
                           {c.flaggedCategories.slice(0, 2).map(id => (
-                            <span key={id} className={`text-[7px] font-bold px-1 py-0.5 rounded font-mono ${sel ? 'bg-indigo-700 text-indigo-200' : 'bg-amber-50 text-amber-700'}`}>{id}</span>
+                            <span key={id} className={`text-[7px] font-bold px-1 py-0.5 rounded font-mono ${sel ? 'bg-blue-900 text-blue-200' : 'bg-amber-50 text-amber-700'}`}>{id}</span>
                           ))}
                           {c.flaggedCategories.length > 2 && (
-                            <span className={`text-[7px] px-1 py-0.5 rounded ${sel ? 'bg-indigo-700 text-indigo-300' : 'bg-slate-100 text-slate-500'}`}>+{c.flaggedCategories.length - 2}</span>
+                            <span className={`text-[7px] px-1 py-0.5 rounded ${sel ? 'bg-blue-900 text-blue-300' : 'bg-slate-100 text-slate-500'}`}>+{c.flaggedCategories.length - 2}</span>
                           )}
                         </div>
                       </div>
@@ -1135,7 +1394,7 @@ function AgentDetailModal({ agent, finding, onClose }: { agent: AgentDef; findin
         <div className="flex items-start justify-between px-5 py-4 border-b border-slate-200 shrink-0">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[8px] font-bold font-mono text-indigo-600">{agent.htRule}</span>
+              <span className="text-[8px] font-bold font-mono text-blue-800">{agent.htRule}</span>
               <VerdictChip verdict={finding.verdict} />
             </div>
             <div className="text-sm font-bold text-slate-900">{agent.name}</div>
@@ -1211,12 +1470,12 @@ function AgentScanningPanel() {
                 {hits > 0 && <span className="text-[8px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">{hits} hit{hits > 1 ? 's' : ''}</span>}
               </div>
               <div className="flex items-center gap-1 mb-1.5">
-                <span className="text-[7px] font-bold text-indigo-600 font-mono">{agent.htRule}</span>
+                <span className="text-[7px] font-bold text-blue-800 font-mono">{agent.htRule}</span>
                 <span className="text-[7px] text-slate-300">·</span>
                 <span className="text-[7px] text-slate-400">{agent.scanCount} {agent.scanLabel}</span>
               </div>
               <div className="h-0.5 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 rounded-full animate-pulse" style={{ width: hits > 0 ? '100%' : '55%' }} />
+                <div className="h-full bg-blue-600 rounded-full animate-pulse" style={{ width: hits > 0 ? '100%' : '55%' }} />
               </div>
             </div>
           )
@@ -1247,7 +1506,7 @@ function AgentCasePanel({ caseId, invPhase, completedAgents }: {
     .filter(Boolean) as string[]
 
   const headerText = invPhase === 'complete' ? 'Investigation Complete' : 'Agent Investigation'
-  const headerColor = invPhase === 'complete' ? 'bg-emerald-500' : 'bg-indigo-500'
+  const headerColor = invPhase === 'complete' ? 'bg-emerald-500' : 'bg-blue-600'
 
   return (
     <div className="flex flex-col h-full">
@@ -1271,11 +1530,11 @@ function AgentCasePanel({ caseId, invPhase, completedAgents }: {
         {/* Phase: detecting */}
         {invPhase !== 'idle' && (
           <div className={`rounded-xl border p-3 transition-all duration-500 ${
-            invPhase === 'detecting' ? 'bg-indigo-50 border-indigo-200' : 'bg-emerald-50 border-emerald-200'
+            invPhase === 'detecting' ? 'bg-blue-50 border-blue-200' : 'bg-emerald-50 border-emerald-200'
           }`}>
             <div className="flex items-center gap-2 mb-1.5">
               {invPhase === 'detecting'
-                ? <PulseDot color="bg-indigo-500" />
+                ? <PulseDot color="bg-blue-600" />
                 : <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />}
               <span className="text-[9px] font-bold text-slate-700">Rule Engine</span>
             </div>
@@ -1294,10 +1553,10 @@ function AgentCasePanel({ caseId, invPhase, completedAgents }: {
 
         {/* Phase: dispatching */}
         {invPhase === 'dispatching' && (
-          <div className="rounded-xl border bg-indigo-50 border-indigo-200 p-3">
+          <div className="rounded-xl border bg-blue-50 border-blue-200 p-3">
             <div className="flex items-center gap-2">
-              <PulseDot color="bg-indigo-500" />
-              <span className="text-[9px] font-bold text-indigo-700">Dispatching {nonStrat.length} specialist agents…</span>
+              <PulseDot color="bg-blue-600" />
+              <span className="text-[9px] font-bold text-blue-900">Dispatching {nonStrat.length} specialist agents…</span>
             </div>
           </div>
         )}
@@ -1315,7 +1574,7 @@ function AgentCasePanel({ caseId, invPhase, completedAgents }: {
                 {done
                   ? <div className={`w-2 h-2 rounded-full shrink-0 ${f.verdict === 'FLAGGED' ? 'bg-red-500' : 'bg-amber-400'}`} />
                   : <PulseDot color={active ? 'bg-slate-400' : 'bg-slate-300'} />}
-                <span className="text-[7px] font-bold font-mono text-indigo-600 w-7 shrink-0">{agent.htRule}</span>
+                <span className="text-[7px] font-bold font-mono text-blue-800 w-7 shrink-0">{agent.htRule}</span>
                 <span className="text-[9px] font-semibold text-slate-700 flex-1 truncate">{agent.name}</span>
                 {done && <VerdictChip verdict={f.verdict} />}
                 {!done && active && <span className="text-[8px] text-slate-400 italic">Analyzing…</span>}
@@ -1325,7 +1584,7 @@ function AgentCasePanel({ caseId, invPhase, completedAgents }: {
                   <ConfidenceBar value={f.confidence} />
                   <div className="mt-2 flex justify-end">
                     <button onClick={() => setModal(f.agentId)}
-                      className="text-[8px] font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors">
+                      className="text-[8px] font-semibold text-blue-800 hover:text-blue-900 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors">
                       Full Analysis →
                     </button>
                   </div>
@@ -1357,7 +1616,7 @@ function AgentCasePanel({ caseId, invPhase, completedAgents }: {
                   <ConfidenceBar value={strategist.confidence} />
                   <div className="mt-2 flex justify-end">
                     <button onClick={() => setModal('strategist')}
-                      className="text-[8px] font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors">
+                      className="text-[8px] font-semibold text-blue-800 hover:text-blue-900 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors">
                       Full Analysis →
                     </button>
                   </div>
@@ -1388,36 +1647,67 @@ function AgentCasePanel({ caseId, invPhase, completedAgents }: {
 
 // ── Main ──────────────────────────────────────────────────────────────────────────
 
-const AGENT_TIMING_MS = [2200, 3500, 4800, 6100]
+const STEP_MS   = 320  // ms between each revealed step
+const AGENT_GAP = 450  // ms pause between finishing one agent and starting the next
 
 export default function DarkPatterns() {
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
-  const [invPhase, setInvPhase]             = useState<InvPhase>('idle')
-  const [completedAgents, setCompletedAgents] = useState<string[]>([])
+  const [selectedCaseId,    setSelectedCaseId]    = useState<string | null>(null)
+  const [invPhase,          setInvPhase]          = useState<InvPhase>('idle')
+  const [completedAgents,   setCompletedAgents]   = useState<string[]>([])
+  const [revealedAgentSteps, setRevealedAgentSteps] = useState<Record<string, number>>({})
 
   useEffect(() => {
-    if (!selectedCaseId) { setInvPhase('idle'); setCompletedAgents([]); return }
+    if (!selectedCaseId) {
+      setInvPhase('idle'); setCompletedAgents([]); setRevealedAgentSteps({})
+      return
+    }
 
     const nonStrat = AGENT_FINDINGS.filter(f => f.caseId === selectedCaseId && f.agentId !== 'strategist')
+    const stratF   = AGENT_FINDINGS.find(f => f.caseId === selectedCaseId && f.agentId === 'strategist')
     const timers: ReturnType<typeof setTimeout>[] = []
+    const at = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms))
 
     setInvPhase('detecting')
     setCompletedAgents([])
+    setRevealedAgentSteps({})
 
-    timers.push(setTimeout(() => setInvPhase('dispatching'), 700))
-    timers.push(setTimeout(() => setInvPhase('investigating'), 1300))
+    at(800,  () => setInvPhase('dispatching'))
+    at(1600, () => setInvPhase('investigating'))
 
-    nonStrat.forEach((f, i) => {
-      const t = 1300 + (AGENT_TIMING_MS[i] ?? AGENT_TIMING_MS[AGENT_TIMING_MS.length - 1] + (i - AGENT_TIMING_MS.length + 1) * 1200)
-      timers.push(setTimeout(() => setCompletedAgents(prev => [...prev, f.agentId]), t))
-    })
+    let cursor = 1600
 
-    const lastT = 1300 + (AGENT_TIMING_MS[Math.min(nonStrat.length - 1, AGENT_TIMING_MS.length - 1)] ?? 2200)
-    timers.push(setTimeout(() => setInvPhase('synthesizing'), lastT + 500))
-    timers.push(setTimeout(() => {
-      setCompletedAgents(prev => [...prev, 'strategist'])
-      setInvPhase('complete')
-    }, lastT + 2400))
+    for (const f of nonStrat) {
+      const agentId = f.agentId
+      // Agent appears with 0 steps visible
+      at(cursor, () => setRevealedAgentSteps(p => ({ ...p, [agentId]: 0 })))
+      // Each step streams in
+      f.steps.forEach((_, i) => {
+        cursor += STEP_MS
+        const count = i + 1
+        at(cursor, () => setRevealedAgentSteps(p => ({ ...p, [agentId]: count })))
+      })
+      // Agent verdict appears after final step
+      cursor += STEP_MS
+      at(cursor, () => setCompletedAgents(p => [...p, agentId]))
+      cursor += AGENT_GAP
+    }
+
+    // Strategist synthesis phase
+    at(cursor, () => setInvPhase('synthesizing'))
+    cursor += 300
+    if (stratF) {
+      at(cursor, () => setRevealedAgentSteps(p => ({ ...p, strategist: 0 })))
+      stratF.steps.forEach((_, i) => {
+        cursor += STEP_MS
+        const count = i + 1
+        at(cursor, () => setRevealedAgentSteps(p => ({ ...p, strategist: count })))
+      })
+      cursor += STEP_MS
+      at(cursor, () => { setCompletedAgents(p => [...p, 'strategist']); setInvPhase('complete') })
+    } else {
+      cursor += 1800
+      at(cursor, () => { setCompletedAgents(p => [...p, 'strategist']); setInvPhase('complete') })
+    }
 
     return () => timers.forEach(clearTimeout)
   }, [selectedCaseId])
@@ -1425,6 +1715,7 @@ export default function DarkPatterns() {
   function handleSelectCase(id: string) {
     setInvPhase('idle')
     setCompletedAgents([])
+    setRevealedAgentSteps({})
     setSelectedCaseId(null)
     requestAnimationFrame(() => setSelectedCaseId(id))
   }
@@ -1432,7 +1723,7 @@ export default function DarkPatterns() {
   return (
     <div className="flex h-full overflow-hidden">
       <CaseRegistry selectedId={selectedCaseId} onSelect={handleSelectCase} />
-      <CenterPanel caseId={selectedCaseId} invPhase={invPhase} completedAgents={completedAgents} />
+      <CenterPanel caseId={selectedCaseId} invPhase={invPhase} completedAgents={completedAgents} revealedAgentSteps={revealedAgentSteps} />
       <div className="w-[270px] shrink-0 border-l border-slate-200 bg-white overflow-hidden flex flex-col">
         {selectedCaseId
           ? <AgentCasePanel key={selectedCaseId} caseId={selectedCaseId} invPhase={invPhase} completedAgents={completedAgents} />

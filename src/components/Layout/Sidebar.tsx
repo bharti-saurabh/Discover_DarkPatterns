@@ -125,7 +125,7 @@ function LLMConfigModal({ onClose }: { onClose: () => void }) {
       <div className="relative bg-white rounded-2xl shadow-2xl w-[420px] p-6 z-10">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-blue-800 flex items-center justify-center">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
@@ -150,7 +150,7 @@ function LLMConfigModal({ onClose }: { onClose: () => void }) {
               value={draft.apiKey}
               onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
               placeholder="sk-ant-api03-… or JWT token"
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono"
             />
           </div>
 
@@ -161,7 +161,7 @@ function LLMConfigModal({ onClose }: { onClose: () => void }) {
               value={draft.baseUrl}
               onChange={e => setDraft(d => ({ ...d, baseUrl: e.target.value }))}
               placeholder="https://llmfoundry.straive.com/anthropic"
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono"
             />
           </div>
 
@@ -170,7 +170,7 @@ function LLMConfigModal({ onClose }: { onClose: () => void }) {
             <select
               value={draft.model}
               onChange={e => setDraft(d => ({ ...d, model: e.target.value }))}
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white"
             >
               <option value="claude-opus-4-7">Claude Opus 4.7 (most capable)</option>
               <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (balanced)</option>
@@ -191,7 +191,7 @@ function LLMConfigModal({ onClose }: { onClose: () => void }) {
             <button
               onClick={handleSave}
               disabled={!draft.apiKey.trim()}
-              className="text-sm px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="text-sm px-4 py-2 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {saved ? '✓ Saved' : 'Save'}
             </button>
@@ -238,13 +238,13 @@ export default function Sidebar({ active, onNavigate }: Props) {
                 'w-full flex items-center rounded-lg text-left transition-colors',
                 collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5',
                 isActive
-                  ? 'bg-indigo-50 text-indigo-700'
+                  ? 'bg-blue-50 text-blue-900'
                   : item.available
                     ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                     : 'text-slate-300 cursor-not-allowed',
               ].join(' ')}
             >
-              <span className={`shrink-0 ${isActive ? 'text-indigo-600' : ''}`}>{item.icon}</span>
+              <span className={`shrink-0 ${isActive ? 'text-blue-800' : ''}`}>{item.icon}</span>
               {!collapsed && (
                 <>
                   <div className="min-w-0 flex-1">
@@ -255,7 +255,7 @@ export default function Sidebar({ active, onNavigate }: Props) {
                     <span className="ml-auto text-[10px] font-medium text-slate-300 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">Soon</span>
                   )}
                   {item.available && item.preview && !isActive && (
-                    <span className="ml-auto text-[9px] font-semibold text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded shrink-0">Preview</span>
+                    <span className="ml-auto text-[9px] font-semibold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">Preview</span>
                   )}
                 </>
               )}

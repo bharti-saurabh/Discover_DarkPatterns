@@ -56,7 +56,7 @@ function PBAgentDetailModal({ agent, finding, onClose }: { agent: PBAgent; findi
         <div className="flex items-start justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[8px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{agent.rule}</span>
+              <span className="text-[8px] font-bold font-mono text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded">{agent.rule}</span>
               <VerdictChip verdict={finding.verdict} />
             </div>
             <div className="text-sm font-bold text-slate-900">{agent.name}</div>
@@ -103,7 +103,7 @@ function PBAgentDetailModal({ agent, finding, onClose }: { agent: PBAgent; findi
 // ── Grooming Timeline ─────────────────────────────────────────────────────────────
 
 const EVENT_COLOR: Record<string, { dot: string; bg: string; text: string }> = {
-  'contact':       { dot: 'bg-indigo-400',  bg: 'bg-indigo-50',  text: 'text-indigo-700' },
+  'contact':       { dot: 'bg-blue-500',  bg: 'bg-blue-50',  text: 'text-blue-900' },
   'test-deposit':  { dot: 'bg-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700' },
   'wire':          { dot: 'bg-red-500',     bg: 'bg-red-50',     text: 'text-red-700' },
   'credit-advance':{ dot: 'bg-violet-500',  bg: 'bg-violet-50',  text: 'text-violet-700' },
@@ -121,7 +121,7 @@ function GroomingTimeline({ c }: { c: PBCase }) {
     <div>
       {/* Phase labels */}
       <div className="flex text-[8px] font-bold uppercase tracking-wider mb-2">
-        <div style={{ width: `${attackStartPct}%` }} className="text-indigo-500">
+        <div style={{ width: `${attackStartPct}%` }} className="text-blue-600">
           Grooming · {c.groomingDays} days
         </div>
         <div style={{ width: `${100 - attackStartPct}%` }} className="text-red-500 text-right">
@@ -132,7 +132,7 @@ function GroomingTimeline({ c }: { c: PBCase }) {
       {/* Track */}
       <div className="relative mb-8">
         <div className="h-3 flex rounded-full overflow-hidden">
-          <div className="bg-indigo-100" style={{ width: `${attackStartPct}%` }} />
+          <div className="bg-blue-100" style={{ width: `${attackStartPct}%` }} />
           <div className="bg-red-100 flex-1" />
         </div>
         {/* Phase divider */}
@@ -229,7 +229,7 @@ function TransferChart({ c }: { c: PBCase }) {
     <div>
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-slate-700">Transfer Escalation</span>
-        <span className="text-[9px] text-indigo-600 font-mono">avg monthly spend {fmt$(c.avgMonthlySpend)}</span>
+        <span className="text-[9px] text-blue-800 font-mono">avg monthly spend {fmt$(c.avgMonthlySpend)}</span>
       </div>
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={chartData} margin={{ top: 8, right: 4, left: -8, bottom: 0 }} barCategoryGap={6}>
@@ -295,7 +295,7 @@ function PBAgentSignalCards({ findings }: { findings: PBFinding[] }) {
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="text-[8px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{agent.rule}</span>
+                      <span className="text-[8px] font-bold font-mono text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded">{agent.rule}</span>
                       <VerdictChip verdict={f.verdict} />
                     </div>
                     <div className="text-xs font-bold text-slate-900 leading-tight">{agent.name}</div>
@@ -443,7 +443,7 @@ function VictimDetail({ c }: { c: PBCase }) {
                 <span className="text-[9px] font-bold text-slate-600">{(c.creditUtilBefore * 100).toFixed(0)}%</span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${c.creditUtilBefore * 100}%` }} />
+                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${c.creditUtilBefore * 100}%` }} />
               </div>
             </div>
             <div className="flex-1">
@@ -618,7 +618,7 @@ function PBAgentPanel({ caseId }: { caseId: string }) {
                 onClick={() => setExpanded(prev => prev === f.agentId ? null : f.agentId)}
               >
                 <div className={`w-2 h-2 rounded-full shrink-0 ${f.verdict === 'FLAGGED' ? 'bg-red-500' : 'bg-amber-400'}`} />
-                <span className="text-[7px] font-bold font-mono text-indigo-600 w-7 shrink-0">{agent.rule}</span>
+                <span className="text-[7px] font-bold font-mono text-blue-800 w-7 shrink-0">{agent.rule}</span>
                 <span className="text-[9px] font-semibold text-slate-800 flex-1 truncate">{agent.name}</span>
                 <VerdictChip verdict={f.verdict} />
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round"
@@ -637,7 +637,7 @@ function PBAgentPanel({ caseId }: { caseId: string }) {
                       <div className="flex-1"><ConfidenceBar value={f.confidence} /></div>
                       <button
                         onClick={() => setModal(f.agentId)}
-                        className="shrink-0 text-[8px] font-semibold text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                        className="shrink-0 text-[8px] font-semibold text-blue-800 hover:text-blue-900 border border-blue-200 hover:border-blue-500 px-2 py-1 rounded transition-colors whitespace-nowrap"
                       >Full Analysis →</button>
                     </div>
                   </div>
@@ -672,7 +672,7 @@ function PBAgentPanel({ caseId }: { caseId: string }) {
                     <div className="flex-1"><ConfidenceBar value={strategist.confidence} /></div>
                     <button
                       onClick={() => setModal('pb-strategist')}
-                      className="shrink-0 text-[8px] font-semibold text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                      className="shrink-0 text-[8px] font-semibold text-blue-800 hover:text-blue-900 border border-blue-200 hover:border-blue-500 px-2 py-1 rounded transition-colors whitespace-nowrap"
                     >Full Analysis →</button>
                   </div>
                 </div>
@@ -712,7 +712,7 @@ function PBScanningPanel() {
                 {hits > 0 && <span className="text-[8px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">{hits} hit{hits > 1 ? 's' : ''}</span>}
               </div>
               <div className="flex items-center gap-1 mb-1.5">
-                <span className="text-[7px] font-bold text-indigo-600 font-mono">{agent.rule}</span>
+                <span className="text-[7px] font-bold text-blue-800 font-mono">{agent.rule}</span>
                 <span className="text-[7px] text-slate-400">·</span>
                 <span className="text-[7px] text-slate-400">{agent.scanCount} {agent.scanLabel}</span>
               </div>

@@ -34,8 +34,8 @@ function ControllerNode({ data }: { data: { ip: string; fp: string } }) {
 function AccountNode({ data }: { data: { id: string; name: string; institution: string; cashOut: number; signals: string[]; daysOld: number } }) {
   const isCapOne = data.institution === 'capone'
   const isExternal = data.institution === 'external'
-  const border = isCapOne ? 'border-indigo-300' : isExternal ? 'border-slate-300' : 'border-violet-300'
-  const header = isCapOne ? 'bg-indigo-600' : isExternal ? 'bg-slate-500' : 'bg-violet-600'
+  const border = isCapOne ? 'border-blue-300' : isExternal ? 'border-slate-300' : 'border-violet-300'
+  const header = isCapOne ? 'bg-blue-800' : isExternal ? 'bg-slate-500' : 'bg-violet-600'
   const label = isCapOne ? 'Capital One' : isExternal ? 'Other Issuer' : 'Discover'
   return (
     <div className={`bg-white rounded-lg border-2 ${border} shadow-sm min-w-[160px]`}>

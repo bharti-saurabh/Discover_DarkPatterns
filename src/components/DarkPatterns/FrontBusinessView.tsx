@@ -70,7 +70,7 @@ function HourChart({ data, nightPct }: { data: FrontBusinessCase['hourlyVolume']
         </BarChart>
       </ResponsiveContainer>
       <div className="flex gap-4 mt-1">
-        <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-indigo-500 inline-block" /> This merchant</span>
+        <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-blue-600 inline-block" /> This merchant</span>
         <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> After 10 PM (flagged)</span>
         <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-sm bg-slate-200 inline-block" /> Peer average</span>
       </div>

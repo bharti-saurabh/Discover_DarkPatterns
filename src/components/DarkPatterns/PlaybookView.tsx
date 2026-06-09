@@ -17,19 +17,19 @@ function RuleList({ selectedId, onSelect }: { selectedId: string; onSelect: (id:
       <button
         onClick={() => onSelect(rule.categoryId)}
         className={`w-full text-left rounded-xl border px-3 py-2.5 transition-all ${
-          sel ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200 hover:border-slate-300'
+          sel ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-slate-300'
         }`}
       >
         <div className="flex items-center gap-1.5 mb-1">
           <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded ${
-            sel ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+            sel ? 'bg-blue-100 text-blue-900' : 'bg-slate-100 text-slate-500'
           }`}>{rule.ruleId}</span>
           <span className={`text-[8px] font-mono ${sel ? 'text-amber-600' : 'text-amber-500'}`}>{rule.categoryId}</span>
         </div>
-        <div className={`text-[10px] font-semibold leading-snug ${sel ? 'text-indigo-900' : 'text-slate-700'}`}>
+        <div className={`text-[10px] font-semibold leading-snug ${sel ? 'text-blue-950' : 'text-slate-700'}`}>
           {cat?.label ?? rule.categoryId}
         </div>
-        <div className={`text-[8px] mt-0.5 ${sel ? 'text-indigo-400' : 'text-slate-400'}`}>{rule.advisoryRef}</div>
+        <div className={`text-[8px] mt-0.5 ${sel ? 'text-blue-500' : 'text-slate-400'}`}>{rule.advisoryRef}</div>
       </button>
     )
   }
@@ -75,10 +75,10 @@ function AdvisoryDetail({ rule }: { rule: PlaybookRule }) {
   const signalSteps   = rule.computationalSteps.filter(s => !s.toLowerCase().startsWith('flag when'))
 
   const isHT      = HT_REFS.has(rule.advisoryRef)
-  const accentBg  = isHT ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-100'
-  const accentText = isHT ? 'text-amber-900' : 'text-indigo-900'
-  const badgeCls  = isHT ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-indigo-100 border-indigo-200 text-indigo-700'
-  const linkCls   = isHT ? 'text-amber-600 hover:text-amber-500 border-amber-300' : 'text-indigo-600 hover:text-indigo-500 border-indigo-200'
+  const accentBg  = isHT ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-100'
+  const accentText = isHT ? 'text-amber-900' : 'text-blue-950'
+  const badgeCls  = isHT ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-blue-100 border-blue-200 text-blue-900'
+  const linkCls   = isHT ? 'text-amber-600 hover:text-amber-500 border-amber-300' : 'text-blue-800 hover:text-blue-600 border-blue-200'
 
   return (
     <div className="h-full overflow-y-auto space-y-4 pr-1">
@@ -96,8 +96,8 @@ function AdvisoryDetail({ rule }: { rule: PlaybookRule }) {
         </div>
         <h2 className={`text-sm font-bold leading-snug mb-3 ${accentText}`}>{rule.advisoryTitle}</h2>
         <p className={`text-[11px] leading-relaxed mb-3 ${accentText} opacity-90`}>{rule.advisoryGuidance}</p>
-        <div className={`pt-3 border-t ${isHT ? 'border-amber-200' : 'border-indigo-100'}`}>
-          <div className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isHT ? 'text-amber-600' : 'text-indigo-600'}`}>
+        <div className={`pt-3 border-t ${isHT ? 'border-amber-200' : 'border-blue-100'}`}>
+          <div className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isHT ? 'text-amber-600' : 'text-blue-800'}`}>
             Detection Objective
           </div>
           <p className={`text-[11px] leading-relaxed ${accentText} opacity-80`}>{rule.detectionObjective}</p>
@@ -177,7 +177,7 @@ function AdvisoryDetail({ rule }: { rule: PlaybookRule }) {
             <div className="flex flex-wrap gap-1.5">
               {rule.script.tables.map(t => (
                 <span key={t.name} className={`text-[8px] font-mono font-bold px-2 py-0.5 rounded border ${
-                  t.source === 'capone'   ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                  t.source === 'capone'   ? 'bg-blue-50 text-blue-900 border-blue-200' :
                   t.source === 'discover' ? 'bg-violet-50 text-violet-700 border-violet-200' :
                                             'bg-slate-100 text-slate-500 border-slate-200'
                 }`}>{t.name}</span>

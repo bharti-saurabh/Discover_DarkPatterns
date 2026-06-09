@@ -20,13 +20,13 @@ interface TableNodeData {
 
 function TableNode({ data }: { data: TableNodeData }) {
   const headerColor = data.side === 'capone'
-    ? 'bg-indigo-600 text-white'
+    ? 'bg-blue-800 text-white'
     : data.side === 'discover'
       ? 'bg-violet-600 text-white'
       : 'bg-amber-500 text-white'
 
   const borderColor = data.side === 'capone'
-    ? 'border-indigo-300'
+    ? 'border-blue-300'
     : data.side === 'discover'
       ? 'border-violet-300'
       : 'border-amber-300'
@@ -56,7 +56,7 @@ function TableNode({ data }: { data: TableNodeData }) {
         )}
         {data.fkFields.map(f => (
           <div key={f} className="flex items-center gap-2 px-3 py-1.5">
-            <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded shrink-0">FK</span>
+            <span className="text-[9px] font-bold text-blue-800 bg-blue-50 px-1 py-0.5 rounded shrink-0">FK</span>
             <span className="font-mono text-[10px] text-slate-600 truncate">{f}</span>
           </div>
         ))}
@@ -140,7 +140,7 @@ const NODES: Node[] = [
     data: { label: 'disc_cardholder_txns', side: 'discover', recordCount: '35K', pkField: 'txn_id', fkFields: ['account_id','merchant_id'], joinFields: ['network_txn_id'] },
   },
 
-  // ── Discover Network ─────────────────────────────────────
+  // ── Capital One Network ─────────────────────────────────────
   {
     id: 'disc_merchants', type: 'table', position: { x: 1130, y: 360 },
     data: { label: 'disc_merchants', side: 'discover', recordCount: '2K', pkField: 'merchant_id', fkFields: ['acquirer_id'], joinFields: ['ein_hash'] },
@@ -247,7 +247,7 @@ export default function ERDiagram() {
 
         {/* Legend */}
         <div className="ml-auto flex items-center gap-4 text-[11px]">
-          <span className="flex items-center gap-1.5"><span className="inline-block w-6 h-0.5 bg-indigo-500 rounded"></span> Capital One internal</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-6 h-0.5 bg-blue-600 rounded"></span> Capital One internal</span>
           <span className="flex items-center gap-1.5"><span className="inline-block w-6 h-0.5 bg-violet-500 rounded"></span> Discover internal</span>
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-6 h-0.5 bg-amber-500 rounded" style={{ backgroundImage: 'repeating-linear-gradient(90deg,#F59E0B 0,#F59E0B 4px,transparent 4px,transparent 8px)' }}></span>
@@ -257,7 +257,7 @@ export default function ERDiagram() {
             <span className="text-amber-600 font-mono text-[10px] bg-amber-100 px-1 rounded">PK</span> Primary key
           </span>
           <span className="flex items-center gap-1.5 text-slate-400">
-            <span className="text-indigo-600 font-mono text-[10px] bg-indigo-50 px-1 rounded">FK</span> Foreign key
+            <span className="text-blue-800 font-mono text-[10px] bg-blue-50 px-1 rounded">FK</span> Foreign key
           </span>
         </div>
       </div>

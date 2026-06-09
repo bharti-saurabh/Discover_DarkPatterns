@@ -66,7 +66,7 @@ export default function SarPanel({
                   <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
                   <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
                 </svg>
-                <span className="text-[11px] font-bold text-indigo-700 font-mono">{ref.caseId}</span>
+                <span className="text-[11px] font-bold text-blue-900 font-mono">{ref.caseId}</span>
               </div>
               <div className="text-[9px] text-slate-400 font-medium">{TAB_LABEL[ref.tab]}</div>
               <p className="text-[10px] text-slate-600 leading-relaxed">{ref.relationship}</p>

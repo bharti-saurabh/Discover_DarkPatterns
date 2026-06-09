@@ -2,13 +2,13 @@ import { useState } from 'react'
 import type { DetectionStep } from '../../data/darkPatternsData'
 
 const SOURCE_CONFIG = {
-  capone:   { label: 'Cap One',  bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+  capone:   { label: 'Cap One',  bg: 'bg-blue-100', text: 'text-blue-900', dot: 'bg-blue-600' },
   discover: { label: 'Discover', bg: 'bg-violet-100', text: 'text-violet-700', dot: 'bg-violet-500' },
   combined: { label: 'Combined', bg: 'bg-slate-700',  text: 'text-slate-200',  dot: 'bg-slate-400' },
 }
 
 function ConfidenceBar({ value }: { value: number }) {
-  const color = value >= 95 ? 'bg-indigo-500' : value >= 85 ? 'bg-emerald-500' : 'bg-amber-500'
+  const color = value >= 95 ? 'bg-blue-600' : value >= 85 ? 'bg-emerald-500' : 'bg-amber-500'
   return (
     <div className="flex items-center gap-2 mt-2">
       <div className="flex-1 h-1 bg-slate-700 rounded-full overflow-hidden">

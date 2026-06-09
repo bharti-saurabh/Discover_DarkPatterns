@@ -6,8 +6,8 @@ interface Stat {
 }
 
 const STATS: Stat[] = [
-  { label: 'Capital One Customers',   value: '5,000',   sub: 'Cap One cardholders',    accent: 'indigo' },
-  { label: 'Capital One Transactions',value: '50,000',  sub: 'Issuer auth records',     accent: 'indigo' },
+  { label: 'Capital One Customers',   value: '5,000',   sub: 'Cap One cardholders',    accent: 'capone' },
+  { label: 'Capital One Transactions',value: '50,000',  sub: 'Issuer auth records',     accent: 'capone' },
   { label: 'Discover Customers',      value: '4,000',   sub: 'Discover cardholders',    accent: 'violet' },
   { label: 'Network Transactions',      value: '100,000', sub: 'All issuers on network',  accent: 'violet' },
   { label: 'Matched Customers',          value: '~2,000',  sub: 'Same person, both CRMs',  accent: 'slate' },
@@ -15,7 +15,7 @@ const STATS: Stat[] = [
 ]
 
 const ACCENT_COLORS: Record<string, { num: string; label: string; border: string }> = {
-  indigo: { num: 'text-indigo-700', label: 'text-indigo-500', border: 'border-indigo-200' },
+  capone: { num: 'text-blue-900', label: 'text-blue-700', border: 'border-blue-200' },
   violet: { num: 'text-violet-700', label: 'text-violet-500', border: 'border-violet-200' },
   amber:  { num: 'text-amber-700',  label: 'text-amber-500',  border: 'border-amber-200' },
   slate:  { num: 'text-slate-700',  label: 'text-slate-500',  border: 'border-slate-200' },

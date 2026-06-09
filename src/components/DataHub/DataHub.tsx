@@ -52,7 +52,7 @@ export default function DataHub() {
             <span className="text-xs font-medium text-slate-500">Field tags:</span>
             {[
               { label: 'PII',   bg: 'bg-rose-50',    text: 'text-rose-700' },
-              { label: 'ID',    bg: 'bg-indigo-50',  text: 'text-indigo-700' },
+              { label: 'ID',    bg: 'bg-blue-50',  text: 'text-blue-900' },
               { label: 'FIN',   bg: 'bg-emerald-50', text: 'text-emerald-700' },
               { label: 'RISK',  bg: 'bg-amber-50',   text: 'text-amber-700' },
               { label: 'BEHAV', bg: 'bg-purple-50',  text: 'text-purple-700' },

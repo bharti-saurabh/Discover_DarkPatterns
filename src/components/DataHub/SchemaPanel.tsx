@@ -15,7 +15,7 @@ interface Props {
 }
 
 const SIDE_COLORS = {
-  A: { header: 'bg-indigo-600', badge: 'bg-indigo-100 text-indigo-700' },
+  A: { header: 'bg-blue-800', badge: 'bg-blue-100 text-blue-900' },
   B: { header: 'bg-violet-600', badge: 'bg-violet-100 text-violet-700' },
 }
 

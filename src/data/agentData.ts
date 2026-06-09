@@ -670,7 +670,7 @@ export const AGENT_FINDINGS: AgentFinding[] = [
         items: [
           { text: 'Individual SAR-HT recommended for CAP-007342 (cardholder)', detail: 'Standard SAR-HT threshold met: 3 FinCEN categories, 3 agent flags, 87% combined confidence. Filing deadline: Dec 12, 2024.', flagged: true },
           { text: 'Venue-level SAR recommended for MID-0001102 (Beaumont, TX property)', detail: 'This property has had 3 coordinated multi-card events in 45 days with completely different cardholder sets each time. The venue is a systemic trafficking facilitation point — not a cardholder-level pattern.', flagged: true },
-          { text: 'BSA South team to request merchant-level investigation from card networks', detail: 'Discover Network can pull all card transactions at MID-0001102 across all issuers for the past 6 months. This would surface the full scale of trafficking activity at this venue.' },
+          { text: 'BSA South team to request merchant-level investigation from card networks', detail: 'Capital One Network can pull all card transactions at MID-0001102 across all issuers for the past 6 months. This would surface the full scale of trafficking activity at this venue.' },
           { text: 'Coordination with Texas AG Human Trafficking Prevention Unit recommended', detail: 'Beaumont is in Jefferson County, TX — jurisdiction of the TXAG unit. BSA South has an existing LE liaison contact.' },
         ],
       },

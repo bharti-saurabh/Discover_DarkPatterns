@@ -36,14 +36,14 @@ function RuleList({ selectedId, onSelect }: { selectedId: string; onSelect: (id:
     return (
       <button onClick={() => onSelect(rule.categoryId)}
         className={`w-full text-left rounded-xl border px-3 py-2.5 transition-all ${
-          sel ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200 hover:border-slate-300'
+          sel ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-slate-300'
         }`}>
         <div className="flex items-center gap-1.5 mb-1">
-          <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded ${sel ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{rule.ruleId}</span>
+          <span className={`text-[8px] font-bold font-mono px-1.5 py-0.5 rounded ${sel ? 'bg-blue-100 text-blue-900' : 'bg-slate-100 text-slate-500'}`}>{rule.ruleId}</span>
           <span className={`text-[8px] font-mono ${sel ? 'text-amber-600' : 'text-amber-500'}`}>{rule.categoryId}</span>
         </div>
-        <div className={`text-[10px] font-semibold leading-snug ${sel ? 'text-indigo-900' : 'text-slate-700'}`}>{cat?.label ?? rule.categoryId}</div>
-        <div className={`text-[8px] mt-0.5 ${sel ? 'text-indigo-400' : 'text-slate-400'}`}>{rule.advisoryRef}</div>
+        <div className={`text-[10px] font-semibold leading-snug ${sel ? 'text-blue-950' : 'text-slate-700'}`}>{cat?.label ?? rule.categoryId}</div>
+        <div className={`text-[8px] mt-0.5 ${sel ? 'text-blue-500' : 'text-slate-400'}`}>{rule.advisoryRef}</div>
       </button>
     )
   }
@@ -100,7 +100,7 @@ function InfographicDetail({ rule }: { rule: PlaybookRule }) {
 
   const headerGradient = isHT
     ? 'from-amber-600 to-orange-500'
-    : 'from-indigo-600 to-violet-600'
+    : 'from-blue-800 to-violet-600'
 
   return (
     <div className="h-full overflow-y-auto space-y-4 pr-1">
@@ -131,7 +131,7 @@ function InfographicDetail({ rule }: { rule: PlaybookRule }) {
         <div className="grid grid-cols-4 gap-3">
           {infographic.stats.map((s, i) => (
             <div key={i} className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
-              <div className={`text-xl font-black font-mono leading-none mb-1.5 ${isHT ? 'text-amber-600' : 'text-indigo-600'}`}>
+              <div className={`text-xl font-black font-mono leading-none mb-1.5 ${isHT ? 'text-amber-600' : 'text-blue-800'}`}>
                 {s.value}
               </div>
               <div className="text-[9px] text-slate-500 leading-tight font-medium">{s.label}</div>
@@ -198,7 +198,7 @@ function InfographicDetail({ rule }: { rule: PlaybookRule }) {
               <div className="flex-1 flex flex-wrap gap-1.5">
                 {rule.script.tables.map(t => (
                   <span key={t.name} className={`text-[8px] font-mono font-bold px-2 py-0.5 rounded border ${
-                    t.source === 'capone'   ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                    t.source === 'capone'   ? 'bg-blue-50 text-blue-900 border-blue-200' :
                     t.source === 'discover' ? 'bg-violet-50 text-violet-700 border-violet-200' :
                                               'bg-slate-100 text-slate-500 border-slate-200'
                   }`}>{t.name}</span>
